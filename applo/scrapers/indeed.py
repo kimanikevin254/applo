@@ -29,7 +29,7 @@ class IndeedScraper(BaseScraper):
         return listings
 
     async def _scrape_page(self, page: Page, title: str, location: str) -> list[JobListing]:
-        params = f"?q={title.replace(' ', '+')}&l={location.replace(' ', '+')}"
+        params = f"?q={title.replace(' ', '+')}&l={location.replace(' ', '+')}&fromage=1&sort=date"
         await page.goto(self.BASE_URL + params, wait_until="networkidle")
         await page.wait_for_timeout(2000)
 

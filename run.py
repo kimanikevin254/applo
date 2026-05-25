@@ -1,8 +1,9 @@
 import asyncio
-from applo.db import init_db
+from applo.db import init_db, get_session, save_listings
 from applo.scrapers import IndeedScraper, GlassdoorScraper
 from applo.pipeline import JobFilter
 from applo.models import SearchCriteria
+from applo.utils.logger import logger
 
 async def main():
     init_db()
@@ -24,9 +25,10 @@ async def main():
 
     filtered = JobFilter(criteria).run(listings)
 
-    print(f"\n{len(filtered)} jobs passed filter:")
-    for job in filtered:
-        salary = f"${job.salary_min}-${job.salary_max}" if job.salary_min else "n/a"
-        print(f"  [{job.source.value}] {job.title} @ {job.company} | {job.location} | {salary}")
+    with get_session() as session:
+        saved, skipped = save_listings(session, filtered)
+        logger.info(f"DB | saved: {saved} | skipped duplicates: {skipped}")
+
+    print(f"\n{len(filtered)} jobs passed filter, {saved} saved to DB, {skipped} duplicates skipped")
 
 asyncio.run(main())

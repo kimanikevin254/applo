@@ -2,7 +2,7 @@ from playwright.async_api import Page
 from applo.models import JobListing, JobSource, SearchCriteria
 from applo.utils.logger import logger
 from applo.scrapers.base import BaseScraper
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 
 
@@ -29,23 +29,40 @@ class GlassdoorScraper(BaseScraper):
         return listings
 
     async def _scrape_page(self, page: Page, title: str, location: str) -> list[JobListing]:
-        url = f"https://www.glassdoor.com/Job/jobs.htm?sc.keyword={title.replace(' ', '+')}&locT=C&locId=11047"
+        location_lower = location.lower().strip()
 
-        await page.set_viewport_size({"width": 1280, "height": 800})
-        await page.set_extra_http_headers({
-            "User-Agent": (
-                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            ),
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        })
-
-        try:
+        if location_lower == "remote":
+            url = (
+                f"https://www.glassdoor.com/Job/jobs.htm"
+                f"?sc.keyword={title.replace(' ', '+')}"
+                f"&remoteWorkType=1&sort=date_desc"
+            )
             await page.goto(url, wait_until="domcontentloaded", timeout=45000)
-        except Exception:
-            # if still times out, try with whatever loaded
-            pass
+        else:
+            # start with keyword only, then resolve location via dropdown
+            base_url = f"https://www.glassdoor.com/Job/jobs.htm?sc.keyword={title.replace(' ', '+')}&sort=date_desc"
+            await page.goto(base_url, wait_until="domcontentloaded", timeout=45000)
+            await page.wait_for_timeout(2000)
+
+            try:
+                # clear and fill location input
+                loc_input = await page.wait_for_selector("#searchBar-location", timeout=5000)
+                await loc_input.click()
+                await loc_input.fill("")
+                await loc_input.type(location, delay=80)
+
+                # wait for dropdown and click first suggestion
+                await page.wait_for_selector("#searchBar-location-search-suggestions", timeout=5000)
+                first = await page.query_selector("#searchBar-location-search-suggestions li:first-child")
+                if first:
+                    await first.click()
+                    # wait for URL to change (location resolved) then wait for cards
+                    await page.wait_for_url("**/Job/**", timeout=8000)
+                    await page.wait_for_selector('[data-test="jobListing"]', timeout=10000)
+                else:
+                    logger.warning(f"Glassdoor | no location suggestions for '{location}', searching without location filter")
+            except Exception as e:
+                logger.warning(f"Glassdoor | location resolution failed for '{location}': {e}")
 
         await page.wait_for_timeout(3000)
 
@@ -61,6 +78,7 @@ class GlassdoorScraper(BaseScraper):
                 location_el = await card.query_selector('[class*="JobCard_location"]')
                 salary_el = await card.query_selector('[class*="JobCard_salaryEstimate"]')
                 link_el = await card.query_selector('a[href*="/job-listing/"]')
+                date_el = await card.query_selector('[class*="JobCard_listingAge"]')
 
                 job_title = await title_el.inner_text() if title_el else "Unknown"
                 company = await company_el.inner_text() if company_el else "Unknown"
@@ -68,9 +86,16 @@ class GlassdoorScraper(BaseScraper):
                 salary_text = await salary_el.inner_text() if salary_el else ""
                 href = await link_el.get_attribute("href") if link_el else ""
                 job_url = f"https://www.glassdoor.com{href}" if href and href.startswith("/") else href
+                posted_text = await date_el.inner_text() if date_el else ""
+
+                logger.debug(f"Glassdoor | posted_text raw: '{posted_text}' | title: '{job_title}'")
+
+                # date filter AFTER all fields extracted
+                if posted_text and not self._is_today(posted_text):
+                    logger.debug(f"Glassdoor | skipping old listing ({posted_text}): {job_title} @ {company}")
+                    continue
 
                 external_id = href.split("jobListingId=")[-1].split("&")[0] if "jobListingId=" in href else hashlib.md5(raw_text.encode()).hexdigest()[:12]
-
                 salary_min, salary_max = self._parse_salary(salary_text)
 
                 listings.append(JobListing(
@@ -83,10 +108,15 @@ class GlassdoorScraper(BaseScraper):
                     salary_max=salary_max,
                     job_url=job_url,
                     raw_text=raw_text,
-                    scraped_at=datetime.utcnow(),
+                    scraped_at=datetime.now(timezone.utc),
                 ))
             except Exception as e:
                 logger.warning(f"Glassdoor | skipping card: {e}")
                 continue
 
         return listings
+    
+    def _is_today(self, posted_text: str) -> bool:
+        """Allow jobs posted today or within 1 day (Glassdoor clock is imprecise)"""
+        posted_text = posted_text.lower().strip()
+        return any(unit in posted_text for unit in ["m ago", "h ago", "just posted", "today", "1d"])

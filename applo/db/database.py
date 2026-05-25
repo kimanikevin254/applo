@@ -8,6 +8,7 @@ from sqlalchemy.sql import func
 from datetime import datetime, timezone
 from applo.config import settings
 from applo.models import JobSource, ApplicationStatus
+from applo.utils.logger import logger
 
 engine = create_engine(
     url=settings.database_url,
@@ -58,3 +59,40 @@ def init_db() -> None:
 
 def get_session() -> Session:
     return Session(engine)
+
+def is_duplicate(session: Session, source: str, external_id: str) -> bool:
+    """Check if job already exists in DB by source + external_id."""
+    from applo.models import JobSource
+    result = session.query(JobListingORM).filter_by(
+        source=source,
+        external_id=external_id,
+    ).first()
+    return result is not None
+
+
+def save_listings(session: Session, listings: list) -> tuple[int, int]:
+    """Save listings to DB, skipping duplicates. Returns (saved, skipped)."""
+    from applo.models import JobListing
+    saved, skipped = 0, 0
+    for job in listings:
+        if is_duplicate(session, job.source, job.external_id):
+            logger.debug(f"DB | duplicate skipped: {job.title} @ {job.company}")
+            skipped += 1
+            continue
+        orm = JobListingORM(
+            source=job.source,
+            external_id=job.external_id,
+            title=job.title,
+            company=job.company,
+            location=job.location,
+            salary_min=job.salary_min,
+            salary_max=job.salary_max,
+            job_url=job.job_url,
+            description=job.description,
+            raw_text=job.raw_text,
+            scraped_at=job.scraped_at,
+        )
+        session.add(orm)
+        saved += 1
+    session.commit()
+    return saved, skipped
