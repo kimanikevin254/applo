@@ -2,7 +2,7 @@ from playwright.async_api import Page
 from applo.models import JobListing, JobSource, SearchCriteria
 from applo.utils.logger import logger
 from applo.scrapers.base import BaseScraper
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 
 
@@ -11,13 +11,12 @@ class IndeedScraper(BaseScraper):
 
     async def scrape(self, criteria: SearchCriteria) -> list[JobListing]:
         listings: list[JobListing] = []
-
         for title in criteria.job_titles:
             for location in criteria.locations:
                 logger.info(f"Indeed | scraping: '{title}' in '{location}'")
                 page = await self.new_page()
                 try:
-                    results = await self._scrape_page(page, title, location)
+                    results = await self._scrape_page(page, title, location, criteria.max_age_days)
                     listings.extend(results)
                     logger.info(f"Indeed | found {len(results)} listings")
                 except Exception as e:
@@ -25,11 +24,10 @@ class IndeedScraper(BaseScraper):
                 finally:
                     await page.close()
                 await self.sleep()
-
         return listings
 
-    async def _scrape_page(self, page: Page, title: str, location: str) -> list[JobListing]:
-        params = f"?q={title.replace(' ', '+')}&l={location.replace(' ', '+')}&fromage=1&sort=date"
+    async def _scrape_page(self, page: Page, title: str, location: str, max_age_days: int) -> list[JobListing]:
+        params = f"?q={title.replace(' ', '+')}&l={location.replace(' ', '+')}&fromage={max_age_days}&sort=date"
         await page.goto(self.BASE_URL + params, wait_until="networkidle")
         await page.wait_for_timeout(2000)
 
@@ -68,7 +66,8 @@ class IndeedScraper(BaseScraper):
                     salary_max=salary_max,
                     job_url=job_url,
                     raw_text=raw_text,
-                    scraped_at=datetime.utcnow(),
+                    scraped_at=datetime.now(timezone.utc),
+                    posted_text=None
                 ))
             except Exception as e:
                 logger.warning(f"Indeed | skipping card: {e}")

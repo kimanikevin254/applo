@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
 class JobSource(str, Enum):
@@ -26,6 +26,7 @@ class JobListing(BaseModel):
     job_url: str
     description: Optional[str] = None      # fetched separately
     raw_text: str                           # full card text as scraped
+    posted_text: Optional[str] = None
     scraped_at: datetime = Field(default_factory=datetime.now(timezone.utc))
     is_duplicate: bool = False
 
@@ -46,3 +47,11 @@ class SearchCriteria(BaseModel):
     excluded_keywords: list[str] = []
     min_salary: Optional[int] = None
     sources: list[JobSource] = [JobSource.INDEED, JobSource.GLASSDOOR]
+    max_age_days: int = 1
+
+    @field_validator("max_age_days")
+    @classmethod
+    def validate_max_age_days(cls, v:int) -> int:
+        if v not in [1, 3, 7]:
+            raise ValueError("max_age_days must be 1, 3 , or 7")
+        return v

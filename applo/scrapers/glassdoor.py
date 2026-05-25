@@ -11,13 +11,12 @@ class GlassdoorScraper(BaseScraper):
 
     async def scrape(self, criteria: SearchCriteria) -> list[JobListing]:
         listings: list[JobListing] = []
-
         for title in criteria.job_titles:
             for location in criteria.locations:
                 logger.info(f"Glassdoor | scraping: '{title}' in '{location}'")
                 page = await self.new_page()
                 try:
-                    results = await self._scrape_page(page, title, location)
+                    results = await self._scrape_page(page, title, location, criteria.max_age_days)
                     listings.extend(results)
                     logger.info(f"Glassdoor | found {len(results)} listings")
                 except Exception as e:
@@ -25,22 +24,24 @@ class GlassdoorScraper(BaseScraper):
                 finally:
                     await page.close()
                 await self.sleep()
-
         return listings
 
-    async def _scrape_page(self, page: Page, title: str, location: str) -> list[JobListing]:
+    async def _scrape_page(self, page: Page, title: str, location: str, max_age_days: int) -> list[JobListing]:
         location_lower = location.lower().strip()
 
         if location_lower == "remote":
             url = (
                 f"https://www.glassdoor.com/Job/jobs.htm"
                 f"?sc.keyword={title.replace(' ', '+')}"
-                f"&remoteWorkType=1&sort=date_desc"
+                f"&remoteWorkType=1&fromAge={max_age_days}&sortBy=date_desc"
             )
             await page.goto(url, wait_until="domcontentloaded", timeout=45000)
         else:
-            # start with keyword only, then resolve location via dropdown
-            base_url = f"https://www.glassdoor.com/Job/jobs.htm?sc.keyword={title.replace(' ', '+')}&sort=date_desc"
+            base_url = (
+                f"https://www.glassdoor.com/Job/jobs.htm"
+                f"?sc.keyword={title.replace(' ', '+')}"
+                f"&fromAge={max_age_days}&sortBy=date_desc"
+            )
             await page.goto(base_url, wait_until="domcontentloaded", timeout=45000)
             await page.wait_for_timeout(2000)
 
@@ -87,14 +88,6 @@ class GlassdoorScraper(BaseScraper):
                 href = await link_el.get_attribute("href") if link_el else ""
                 job_url = f"https://www.glassdoor.com{href}" if href and href.startswith("/") else href
                 posted_text = await date_el.inner_text() if date_el else ""
-
-                logger.debug(f"Glassdoor | posted_text raw: '{posted_text}' | title: '{job_title}'")
-
-                # date filter AFTER all fields extracted
-                if posted_text and not self._is_today(posted_text):
-                    logger.debug(f"Glassdoor | skipping old listing ({posted_text}): {job_title} @ {company}")
-                    continue
-
                 external_id = href.split("jobListingId=")[-1].split("&")[0] if "jobListingId=" in href else hashlib.md5(raw_text.encode()).hexdigest()[:12]
                 salary_min, salary_max = self._parse_salary(salary_text)
 
@@ -109,14 +102,10 @@ class GlassdoorScraper(BaseScraper):
                     job_url=job_url,
                     raw_text=raw_text,
                     scraped_at=datetime.now(timezone.utc),
+                    posted_text=posted_text or None,
                 ))
             except Exception as e:
                 logger.warning(f"Glassdoor | skipping card: {e}")
                 continue
 
         return listings
-    
-    def _is_today(self, posted_text: str) -> bool:
-        """Allow jobs posted today or within 1 day (Glassdoor clock is imprecise)"""
-        posted_text = posted_text.lower().strip()
-        return any(unit in posted_text for unit in ["m ago", "h ago", "just posted", "today", "1d"])
