@@ -27,6 +27,6 @@ class Settings(BaseSettings):
     excluded_keywords: list[str] = Field(default=["senior", "staff", "principal"])
     min_salary: int | None = None
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 settings = Settings()
