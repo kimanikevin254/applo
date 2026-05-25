@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -26,7 +26,7 @@ class JobListing(BaseModel):
     job_url: str
     description: Optional[str] = None      # fetched separately
     raw_text: str                           # full card text as scraped
-    scraped_at: datetime = Field(default_factory=datetime.now(datetime.timezone.utc))
+    scraped_at: datetime = Field(default_factory=datetime.now(timezone.utc))
     is_duplicate: bool = False
 
 class Application(BaseModel):
@@ -36,8 +36,8 @@ class Application(BaseModel):
     tailored_resume_path: Optional[str] = None
     cover_letter: Optional[str] = None
     optimization_notes: Optional[str] = None  # what Claude changed and why
-    created_at: datetime = Field(default_factory=datetime.now(datetime.timezone.utc))
-    updated_at: datetime = Field(default_factory=datetime.now(datetime.timezone.utc))
+    created_at: datetime = Field(default_factory=datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=datetime.now(timezone.utc))
     applied_at: Optional[datetime] = None
 
 class SearchCriteria(BaseModel):
