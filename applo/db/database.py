@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Session, relationship
 from sqlalchemy.sql import func
 from datetime import datetime, timezone
 from applo.config import settings
-from applo.models import JobSource, ApplicationStatus
+from applo.models import JobSource, ApplicationStatus, JobListing
 from applo.utils.logger import logger
 
 engine = create_engine(
@@ -32,6 +32,7 @@ class JobListingORM(Base):
     job_url = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     raw_text = Column(Text, nullable=False)
+    posted_text = Column(String, nullable=True)
     scraped_at = Column(DateTime, default=datetime.now(timezone.utc))
     is_duplicate = Column(Boolean, default=False)
 
@@ -70,9 +71,8 @@ def is_duplicate(session: Session, source: str, external_id: str) -> bool:
     return result is not None
 
 
-def save_listings(session: Session, listings: list) -> tuple[int, int]:
+def save_listings(session: Session, listings: list[JobListing]) -> tuple[int, int]:
     """Save listings to DB, skipping duplicates. Returns (saved, skipped)."""
-    from applo.models import JobListing
     saved, skipped = 0, 0
     for job in listings:
         if is_duplicate(session, job.source, job.external_id):
@@ -90,6 +90,7 @@ def save_listings(session: Session, listings: list) -> tuple[int, int]:
             job_url=job.job_url,
             description=job.description,
             raw_text=job.raw_text,
+            posted_text=job.posted_text,
             scraped_at=job.scraped_at,
         )
         session.add(orm)
