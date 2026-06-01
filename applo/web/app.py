@@ -31,14 +31,22 @@ async def index(request: Request, status: str = "all"):
             .options(joinedload(JobListingORM.application))
             .order_by(JobListingORM.scraped_at.desc())
         )
-        if status != "all":
-            query = query.filter(ApplicationORM.status == status)
-        else:
+
+        if status == "all":
             # exclude not_interested by default
             query = query.filter(
                 (ApplicationORM.status != ApplicationStatus.NOT_INTERESTED) |
                 (ApplicationORM.id == None)
             )
+        elif status == "pending":
+            # pending = no application record yet OR status is pending
+            query = query.filter(
+                (ApplicationORM.id == None) |
+                (ApplicationORM.status == ApplicationStatus.PENDING)
+            )
+        else:
+            query = query.filter(ApplicationORM.status == status)
+
         jobs = query.all()
 
     return templates.TemplateResponse(
