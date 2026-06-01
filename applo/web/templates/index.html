@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="filters">
+    <span style="font-size:0.85rem; color:#666; margin-right:0.5rem;">Filter:</span>
+    <a href="/?status=all" class="{% if current_status == 'all' %}active{% endif %}">All</a>
+    {% for s in statuses %}
+    <a href="/?status={{ s }}" class="{% if current_status == s %}active{% endif %}">
+        {{ s.replace('_', ' ').title() }}
+    </a>
+    {% endfor %}
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>Source</th>
+            <th>Job</th>
+            <th>Salary</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody id="job-list">
+        {% for job in jobs %}
+            {% include "partials/job_row.html" %}
+        {% else %}
+            <tr><td colspan="5" class="empty">No jobs found.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}

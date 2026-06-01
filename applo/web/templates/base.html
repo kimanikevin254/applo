@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Applo</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; }
+
+        header {
+            background: #1a1a2e; color: white; padding: 1rem 2rem;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        header h1 { font-size: 1.4rem; letter-spacing: 1px; }
+        header a { color: white; text-decoration: none; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+
+        .filters {
+            display: flex; gap: 0.5rem; margin-bottom: 1.5rem;
+            flex-wrap: wrap; align-items: center;
+        }
+        .filters a {
+            padding: 0.4rem 1rem; border-radius: 20px; text-decoration: none;
+            background: white; border: 1px solid #ddd; color: #555; font-size: 0.85rem;
+        }
+        .filters a.active { background: #1a1a2e; color: white; border-color: #1a1a2e; }
+
+        table { width: 100%; border-collapse: collapse; background: white;
+                border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        th { background: #f0f0f0; padding: 0.75rem 1rem; text-align: left;
+             font-size: 0.8rem; text-transform: uppercase; color: #666; }
+        td { padding: 0.75rem 1rem; border-top: 1px solid #eee; vertical-align: top; }
+        tr:hover td { background: #fafafa; }
+
+        .badge {
+            display: inline-block; padding: 0.2rem 0.6rem; border-radius: 12px;
+            font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+        }
+        .badge-indeed { background: #e8f4fd; color: #1a73e8; }
+        .badge-glassdoor { background: #e8f8e8; color: #0d7a0d; }
+        .badge-pending { background: #fff3cd; color: #856404; }
+        .badge-optimizing { background: #cce5ff; color: #004085; }
+        .badge-optimized { background: #d4edda; color: #155724; }
+        .badge-approved { background: #d1ecf1; color: #0c5460; }
+        .badge-applied { background: #d6d8db; color: #383d41; }
+        .badge-not_interested { background: #f8d7da; color: #721c24; }
+        .badge-rejected { background: #f8d7da; color: #721c24; }
+
+        .actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+        .btn {
+            padding: 0.3rem 0.7rem; border: none; border-radius: 4px;
+            cursor: pointer; font-size: 0.8rem; text-decoration: none;
+        }
+        .btn-primary { background: #1a1a2e; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn:hover { opacity: 0.85; }
+
+        .salary { color: #2d8a2d; font-weight: 600; font-size: 0.85rem; }
+        .company { font-weight: 600; }
+        .location { color: #666; font-size: 0.85rem; }
+        .title a { color: #1a1a2e; text-decoration: none; font-weight: 500; }
+        .title a:hover { text-decoration: underline; }
+
+        .empty { text-align: center; padding: 3rem; color: #999; }
+
+        .run-btn {
+            background: #28a745; color: white; padding: 0.5rem 1.2rem;
+            border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1><a href="/">⚡ Applo</a></h1>
+        <button class="run-btn" onclick="alert('Run scraper from terminal: python run.py')">
+            Run Scraper
+        </button>
+    </header>
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

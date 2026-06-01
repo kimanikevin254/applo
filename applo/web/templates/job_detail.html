@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div style="margin-bottom:1rem;">
+    <a href="/" style="color:#1a1a2e; text-decoration:none;">← Back to queue</a>
+</div>
+
+<div style="background:white; border-radius:8px; padding:2rem; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1.5rem;">
+        <div>
+            <h2 style="margin-bottom:0.3rem;">{{ job.title }}</h2>
+            <div class="company">{{ job.company }}</div>
+            <div class="location" style="margin-top:0.3rem;">{{ job.location }}</div>
+            {% if job.salary_min and job.salary_max %}
+                <div class="salary" style="margin-top:0.5rem;">
+                    ${{ "{:,}".format(job.salary_min) }} – ${{ "{:,}".format(job.salary_max) }}
+                </div>
+            {% endif %}
+        </div>
+        <div style="display:flex; flex-direction:column; gap:0.5rem; align-items:flex-end;">
+            <span class="badge badge-{{ job.source.value }}">{{ job.source.value }}</span>
+            {% set status = job.application.status.value if job.application else "pending" %}
+            <span class="badge badge-{{ status }}">{{ status.replace('_', ' ') }}</span>
+            <a href="{{ job.job_url }}" target="_blank" class="btn btn-primary" style="margin-top:0.5rem;">
+                View Original ↗
+            </a>
+        </div>
+    </div>
+
+    <hr style="border:none; border-top:1px solid #eee; margin-bottom:1.5rem;">
+
+    <h3 style="margin-bottom:1rem;">Job Description</h3>
+    <div style="white-space:pre-wrap; line-height:1.7; color:#444; font-size:0.95rem;">
+        {{ job.description or "No description available." }}
+    </div>
+</div>
+
+{% endblock %}
