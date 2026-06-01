@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     # Scraping
     scraper_headless: bool = True
     scraper_delay_secs: int = 2
+    glassdoor_auth_modal_timeout: int = 2000
 
     # Resume
     master_resume_path: Path = Path("data/resumes/master.pdf")
