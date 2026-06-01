@@ -1,7 +1,7 @@
 import asyncio
 from applo.db import init_db, get_session, save_listings
 from applo.scrapers import IndeedScraper, GlassdoorScraper
-from applo.pipeline import JobFilter, JDFetcher
+from applo.pipeline import JobFilter
 from applo.models import SearchCriteria
 from applo.utils.logger import logger
 
@@ -18,19 +18,13 @@ async def main():
 
     listings = []
 
-    # async with IndeedScraper() as indeed_scraper:
-    #     indeed_listings = await indeed_scraper.scrape(criteria)
-    #     listings.extend(indeed_listings)
-    #     # fetch Indeed JDs while browser session is alive
-    #     indeed_fetcher = JDFetcher(indeed_scraper.browser)
-    #     indeed_listings = await indeed_fetcher.fetch_all(indeed_listings)
-
     async with GlassdoorScraper() as gd_scraper:
-        gd_listings = await gd_scraper.scrape(criteria)
-        # no separate JD fetch — already scraped from side panel
+        listings.extend(await gd_scraper.scrape(criteria))
 
-    all_listings = gd_listings
-    filtered = JobFilter(criteria).run(all_listings)
+    async with IndeedScraper() as id_scraper:
+        listings.extend(await id_scraper.scrape(criteria))
+
+    filtered = JobFilter(criteria).run(listings)
 
     for job in filtered:
         desc_preview = job.description[:150] if job.description else "NO DESCRIPTION"
