@@ -3,6 +3,8 @@ import json
 import re
 from pathlib import Path
 from applo.utils.logger import logger
+import re
+
 
 class ResumeParser:
     def __init__(self, pdf_path: str | Path):
@@ -23,12 +25,60 @@ class ResumeParser:
     
     def _structure(self, text: str) -> dict:
         lines = [l.strip() for l in text.split("\n") if l.strip()]
+        sections = self._extract_sections(text)
+        
+        # post-process experience to join wrapped bullet lines
+        if "professional experience" in sections:
+            sections["professional experience"] = self._join_wrapped_lines(
+                sections["professional experience"]
+            )
+        # also handle other common experience section names
+        for key in ["experience", "work experience", "employment"]:
+            if key in sections:
+                sections[key] = self._join_wrapped_lines(sections[key])
 
         return {
             "raw_text": text,
             "lines": lines,
-            "sections": self._extract_sections(text),
+            "sections": sections,
         }
+
+    def _join_wrapped_lines(self, text: str) -> str:
+        """
+        Join continuation lines back into their parent line.
+        A continuation line is one that:
+        - doesn't start with a bullet (●•-)
+        - doesn't look like a job header (contains | or matches date pattern)
+        - doesn't start with a known section keyword
+        """
+        lines = text.split("\n")
+        result = []
+        date_pattern = re.compile(
+            r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|"
+            r"March|April|June|July|August|September|October|November|December)"
+            r"|\d{4}"
+        )
+        bullet_chars = ("●", "•", "-", "*")
+
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                result.append("")
+                continue
+
+            is_bullet = any(stripped.startswith(c) for c in bullet_chars)
+            is_job_header = "|" in stripped or date_pattern.search(stripped)
+
+            if is_bullet or is_job_header or not result:
+                result.append(stripped)
+            else:
+                # continuation line — append to previous
+                if result:
+                    result[-1] = result[-1] + " " + stripped
+                else:
+                    result.append(stripped)
+
+        return "\n".join(line for line in result if line.strip())
     
     def _extract_sections(self, text: str) -> dict:
         section_patterns = [
