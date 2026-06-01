@@ -8,11 +8,13 @@ class JobSource(str, Enum):
     GLASSDOOR = "glassdoor"
 
 class ApplicationStatus(str, Enum):
-    PENDING = "pending"        # scraped, not yet optimized
-    OPTIMIZED = "optimized"    # resume tailored, awaiting review
-    APPROVED = "approved"      # user approved, ready to send
-    APPLIED = "applied"        # sent
-    REJECTED = "rejected"      # user dismissed
+    PENDING = "pending"           # scraped, awaiting user review
+    OPTIMIZING = "optimizing"     # Claude is generating tailored resume
+    OPTIMIZED = "optimized"       # resume ready, awaiting user approval
+    APPROVED = "approved"         # user approved, ready to send
+    APPLIED = "applied"           # sent
+    NOT_INTERESTED = "not_interested"  # dismissed, reversible
+    REJECTED = "rejected"         # company rejected (post-application)
 
 class JobListing(BaseModel):
     id: Optional[int] = None
