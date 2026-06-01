@@ -4,6 +4,7 @@ from applo.utils.logger import logger
 from applo.scrapers.base import BaseScraper
 from datetime import datetime, timezone
 import hashlib
+import asyncio
 
 
 class IndeedScraper(BaseScraper):
@@ -32,12 +33,12 @@ class IndeedScraper(BaseScraper):
         await page.wait_for_timeout(2000)
 
         cards = await page.query_selector_all('[class*="job_seen_beacon"]')
-        listings = []
 
+        # PASS 1: extract metadata from all cards
+        card_data = []
         for card in cards:
             try:
                 raw_text = await card.inner_text()
-
                 title_el = await card.query_selector('[class*="jobTitle"]')
                 company_el = await card.query_selector('[data-testid="company-name"]')
                 location_el = await card.query_selector('[data-testid="text-location"]')
@@ -50,27 +51,67 @@ class IndeedScraper(BaseScraper):
                 salary_text = await salary_el.inner_text() if salary_el else ""
                 href = await link_el.get_attribute("href") if link_el else ""
                 job_url = f"https://www.indeed.com{href}" if href else ""
-
-                # stable unique id from url or fallback to hash
                 external_id = href.split("jk=")[-1].split("&")[0] if "jk=" in href else hashlib.md5(raw_text.encode()).hexdigest()[:12]
 
-                salary_min, salary_max = self._parse_salary(salary_text)
-
-                listings.append(JobListing(
-                    source=JobSource.INDEED,
-                    external_id=external_id,
-                    title=job_title.strip(),
-                    company=company.strip(),
-                    location=location_text.strip(),
-                    salary_min=salary_min,
-                    salary_max=salary_max,
-                    job_url=job_url,
-                    raw_text=raw_text,
-                    scraped_at=datetime.now(timezone.utc),
-                    posted_text=None
-                ))
+                card_data.append({
+                    "raw_text": raw_text,
+                    "job_title": job_title,
+                    "company": company,
+                    "location_text": location_text,
+                    "salary_text": salary_text,
+                    "href": href,
+                    "job_url": job_url,
+                    "external_id": external_id,
+                })
             except Exception as e:
-                logger.warning(f"Indeed | skipping card: {e}")
+                logger.warning(f"Indeed | skipping card metadata: {e}")
                 continue
+
+        # PASS 2: click each card and extract JD from right panel
+        listings = []
+        cards = await page.query_selector_all('[class*="job_seen_beacon"]')
+
+        for data in card_data:
+            description = ""
+            try:
+                for card in cards:
+                    link_el = await card.query_selector('a[id^="job_"]')
+                    if link_el:
+                        href = await link_el.get_attribute("href")
+                        if href == data["href"]:
+                            await card.click()
+                            await page.wait_for_selector('#jobsearch-ViewjobPaneWrapper', timeout=5000)
+
+                            jd_selectors = [
+                                '#jobDescriptionText',
+                                '#mosaic-vjJobDetails',
+                                '[class*="jobsearch-embeddedBody"]',
+                            ]
+                            for sel in jd_selectors:
+                                jd_el = await page.query_selector(sel)
+                                if jd_el:
+                                    description = (await jd_el.inner_text()).strip()
+                                    break
+                            await asyncio.sleep(1)
+                            break
+            except Exception as e:
+                logger.debug(f"Indeed | right panel JD failed for {data['job_title']}: {e}")
+
+            salary_min, salary_max = self._parse_salary(data["salary_text"])
+
+            listings.append(JobListing(
+                source=JobSource.INDEED,
+                external_id=data["external_id"],
+                title=data["job_title"].strip(),
+                company=data["company"].strip(),
+                location=data["location_text"].strip(),
+                salary_min=salary_min,
+                salary_max=salary_max,
+                job_url=data["job_url"],
+                description=description,
+                raw_text=data["raw_text"],
+                posted_text=None,
+                scraped_at=datetime.now(timezone.utc),
+            ))
 
         return listings
