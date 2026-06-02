@@ -11,6 +11,7 @@ from applo.pipeline.filter import JobFilter
 from applo.resume.generator import ResumeGenerator
 from applo.resume.parser import load_or_parse_resume
 from applo.scrapers import ScraperRegistry
+from applo.config import SEARCH_CONFIG_PATH
 from sqlalchemy.orm import joinedload
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -80,6 +81,33 @@ async def index(request: Request, status: str = "all"):
     )
 
 
+def load_search_config() -> dict:
+    if SEARCH_CONFIG_PATH.exists():
+        return json.loads(SEARCH_CONFIG_PATH.read_text())
+    return {
+        "job_titles": settings.job_titles,
+        "locations": settings.locations,
+        "excluded_keywords": settings.excluded_keywords,
+        "min_salary": settings.min_salary,
+        "max_age_days": settings.scraper_max_age_days,
+    }
+
+
+@app.get("/search-config")
+async def get_search_config():
+    return JSONResponse(load_search_config())
+
+
+@app.post("/search-config")
+async def save_search_config(request: Request):
+    body = await request.json()
+    criteria = SearchCriteria(sources=["indeed"], **body)
+    data = {k: v for k, v in criteria.model_dump().items() if k != "sources"}
+    SEARCH_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SEARCH_CONFIG_PATH.write_text(json.dumps(data, indent=2))
+    return JSONResponse({"ok": True})
+
+
 @app.post("/scrape", response_class=HTMLResponse)
 async def run_scrape(request: Request, sources: Annotated[list[str], Form()] = []):
     if not sources:
@@ -87,14 +115,7 @@ async def run_scrape(request: Request, sources: Annotated[list[str], Form()] = [
             '<tbody id="job-list"><tr><td colspan="4" class="empty"><p>Select at least one source.</p></td></tr></tbody>'
         )
 
-    criteria = SearchCriteria(
-        job_titles=settings.job_titles,
-        locations=settings.locations,
-        excluded_keywords=settings.excluded_keywords,
-        min_salary=settings.min_salary,
-        sources=sources,
-        max_age_days=settings.scraper_max_age_days,
-    )
+    criteria = SearchCriteria(sources=sources, **load_search_config())
 
     async def run_scraper(name: str):
         scraper_cls = ScraperRegistry.get(name)
@@ -143,14 +164,7 @@ async def scrape_stream(sources: list[str] = Query(...)):
         async def emit(event: dict):
             await queue.put(json.dumps(event))
 
-        criteria = SearchCriteria(
-            job_titles=settings.job_titles,
-            locations=settings.locations,
-            excluded_keywords=settings.excluded_keywords,
-            min_salary=settings.min_salary,
-            sources=sources,
-            max_age_days=settings.scraper_max_age_days,
-        )
+        criteria = SearchCriteria(sources=sources, **load_search_config())
 
         async def run_one(name: str) -> list:
             scraper_cls = ScraperRegistry.get(name)

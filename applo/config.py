@@ -32,3 +32,5 @@ class Settings(BaseSettings):
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 settings = Settings()
+
+SEARCH_CONFIG_PATH = Path("data/search-config.json")
