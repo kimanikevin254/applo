@@ -99,7 +99,8 @@ def save_listings(session: Session, listings: list[JobListing]) -> tuple[int, in
     return saved, skipped
 
 def save_optimization(session: Session, job_id: int, tailored_resume_path: str, cover_letter: str, notes: str) -> None:
-    app_record = session.query(ApplicationORM).filter(job_id=job_id).first()
+    from applo.models import ApplicationStatus
+    app_record = session.query(ApplicationORM).filter(ApplicationORM.job_id == job_id).first()
     if not app_record:
         app_record = ApplicationORM(job_id=job_id)
         session.add(app_record)
