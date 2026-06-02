@@ -189,6 +189,7 @@
 
         #actions-card.htmx-request { opacity: 0.5; pointer-events: none; }
 
+
         @keyframes spin { to { transform: rotate(360deg); } }
         .spinning { animation: spin 1s linear infinite; display: inline-block; }
 
@@ -304,7 +305,7 @@
         </div>
     </header>
 
-    <div class="container">
+<div class="container">
         {% block content %}{% endblock %}
     </div>
 
@@ -374,7 +375,7 @@
         }
         refreshResumeStatus();
 
-        function showOptimizing(btn) {
+function showOptimizing(btn) {
             const cell = btn.closest('td') || btn.closest('#actions-card');
             if (!cell) return;
             const isCard = cell.id === 'actions-card';

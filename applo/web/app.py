@@ -235,6 +235,26 @@ async def optimize(request: Request, job_id: int, source: str = Form(default="li
     partial = "partials/job_actions.html" if source == "detail" else "partials/job_row.html"
     return templates.TemplateResponse(request=request, name=partial, context={"job": job})
 
+@app.get("/preview/{job_id}/resume")
+async def preview_resume(job_id: int):
+    with get_session() as session:
+        app_record = session.query(ApplicationORM).filter(ApplicationORM.job_id == job_id).first()
+        if not app_record or not app_record.tailored_resume_path:
+            return HTMLResponse("Resume not found", status_code=404)
+        path = app_record.tailored_resume_path
+    return FileResponse(path, media_type="application/pdf", headers={"Content-Disposition": "inline"})
+
+
+@app.get("/preview/{job_id}/cover")
+async def preview_cover(job_id: int):
+    with get_session() as session:
+        app_record = session.query(ApplicationORM).filter(ApplicationORM.job_id == job_id).first()
+        if not app_record or not app_record.tailored_resume_path:
+            return HTMLResponse("Cover letter not found", status_code=404)
+        cover_path = app_record.tailored_resume_path.replace("_resume.pdf", "_cover.pdf")
+    return FileResponse(cover_path, media_type="application/pdf", headers={"Content-Disposition": "inline"})
+
+
 @app.get("/download/{job_id}/resume")
 async def download_resume(job_id: int):
     with get_session() as session:
