@@ -1,0 +1,124 @@
+{% set status = job.application.status.value if job.application else "pending" %}
+
+<div id="actions-card" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem;">
+    <h3 style="font-size:0.78rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:0.85rem;">Actions</h3>
+    <div style="display:flex;flex-direction:column;gap:0.5rem;">
+
+        <a href="{{ job.job_url }}" target="_blank"
+           style="display:inline-flex;align-items:center;justify-content:center;gap:0.4rem;padding:0.55rem;border:1px solid var(--border);border-radius:7px;text-decoration:none;font-size:0.82rem;color:var(--text);background:var(--bg);">
+            <i data-lucide="external-link" style="width:13px;height:13px;"></i>
+            View Original Posting
+        </a>
+
+        {% if error %}
+            <div style="display:flex;align-items:center;gap:0.4rem;padding:0.55rem;border-radius:7px;background:#fef2f2;border:1px solid #fecaca;font-size:0.82rem;color:var(--danger);">
+                <i data-lucide="alert-circle" style="width:13px;height:13px;flex-shrink:0;"></i>
+                {{ error }}
+            </div>
+
+        {% elif status == "pending" %}
+            <button class="action-btn action-btn-accent"
+                hx-post="/job/{{ job.id }}/optimize"
+                hx-vals='{"source": "detail"}'
+                hx-target="#actions-card"
+                hx-swap="outerHTML"
+                hx-on:htmx:before-request="showOptimizing(this)">
+                <i data-lucide="sparkles" style="width:13px;height:13px;"></i>
+                Optimize Resume
+            </button>
+            <button class="action-btn action-btn-danger"
+                hx-post="/job/{{ job.id }}/status"
+                hx-vals='{"status": "not_interested", "source": "detail"}'
+                hx-target="#actions-card"
+                hx-swap="outerHTML"
+                hx-disabled-elt="#actions-card">
+                <i data-lucide="x" style="width:13px;height:13px;"></i>
+                Not Interested
+            </button>
+
+        {% elif status == "optimizing" %}
+            <div style="display:flex;align-items:center;gap:0.5rem;padding:0.55rem;border-radius:7px;background:#eff6ff;border:1px solid #bfdbfe;font-size:0.82rem;color:#2563eb;">
+                <i data-lucide="loader" style="width:13px;height:13px;" class="spinning"></i>
+                Optimizing your resume…
+            </div>
+
+        {% elif status == "optimized" %}
+            <button class="action-btn action-btn-success"
+                hx-post="/job/{{ job.id }}/status"
+                hx-vals='{"status": "approved", "source": "detail"}'
+                hx-target="#actions-card"
+                hx-swap="outerHTML"
+                hx-disabled-elt="#actions-card">
+                <i data-lucide="check" style="width:13px;height:13px;"></i>
+                Approve
+            </button>
+            <button class="action-btn action-btn-danger"
+                hx-post="/job/{{ job.id }}/status"
+                hx-vals='{"status": "not_interested", "source": "detail"}'
+                hx-target="#actions-card"
+                hx-swap="outerHTML"
+                hx-disabled-elt="#actions-card">
+                <i data-lucide="x" style="width:13px;height:13px;"></i>
+                Not Interested
+            </button>
+
+        {% elif status == "approved" %}
+            <button class="action-btn action-btn-success"
+                hx-post="/job/{{ job.id }}/status"
+                hx-vals='{"status": "applied", "source": "detail"}'
+                hx-target="#actions-card"
+                hx-swap="outerHTML"
+                hx-disabled-elt="#actions-card">
+                <i data-lucide="send" style="width:13px;height:13px;"></i>
+                Mark Applied
+            </button>
+            <button class="action-btn action-btn-danger"
+                hx-post="/job/{{ job.id }}/status"
+                hx-vals='{"status": "not_interested", "source": "detail"}'
+                hx-target="#actions-card"
+                hx-swap="outerHTML"
+                hx-disabled-elt="#actions-card">
+                <i data-lucide="x" style="width:13px;height:13px;"></i>
+                Not Interested
+            </button>
+
+        {% elif status == "not_interested" %}
+            <button class="action-btn"
+                hx-post="/job/{{ job.id }}/status"
+                hx-vals='{"status": "pending", "source": "detail"}'
+                hx-target="#actions-card"
+                hx-swap="outerHTML"
+                hx-disabled-elt="#actions-card">
+                <i data-lucide="rotate-ccw" style="width:13px;height:13px;"></i>
+                Restore
+            </button>
+
+        {% elif status == "applied" %}
+            <button class="action-btn action-btn-warning"
+                hx-post="/job/{{ job.id }}/status"
+                hx-vals='{"status": "rejected", "source": "detail"}'
+                hx-target="#actions-card"
+                hx-swap="outerHTML"
+                hx-disabled-elt="#actions-card">
+                <i data-lucide="thumbs-down" style="width:13px;height:13px;"></i>
+                Mark Rejected
+            </button>
+        {% endif %}
+
+        {% if status in ["optimized", "approved", "applied"] and job.application and job.application.tailored_resume_path %}
+        <div style="height:1px;background:var(--border);margin:0.25rem 0;"></div>
+        <a href="/download/{{ job.id }}/resume"
+           style="display:inline-flex;align-items:center;justify-content:center;gap:0.4rem;padding:0.55rem;border-radius:7px;text-decoration:none;font-size:0.82rem;font-weight:500;color:white;background:var(--accent);">
+            <i data-lucide="download" style="width:13px;height:13px;"></i>
+            Download Resume
+        </a>
+        <a href="/download/{{ job.id }}/cover"
+           style="display:inline-flex;align-items:center;justify-content:center;gap:0.4rem;padding:0.55rem;border:1px solid var(--border);border-radius:7px;text-decoration:none;font-size:0.82rem;color:var(--text);background:var(--bg);">
+            <i data-lucide="download" style="width:13px;height:13px;"></i>
+            Download Cover Letter
+        </a>
+        {% endif %}
+
+    </div>
+</div>
+<script>lucide.createIcons();</script>

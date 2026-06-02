@@ -97,7 +97,7 @@ async def job_detail(request: Request, job_id: int):
 
 
 @app.post("/job/{job_id}/status", response_class=HTMLResponse)
-async def update_status(request: Request, job_id: int, status: str = Form(...)):
+async def update_status(request: Request, job_id: int, status: str = Form(...), source: str = Form(default="list")):
     with get_session() as session:
         app_record = session.query(ApplicationORM).filter(ApplicationORM.job_id == job_id).first()
 
@@ -116,14 +116,12 @@ async def update_status(request: Request, job_id: int, status: str = Form(...)):
             .first()
         )
 
-    return templates.TemplateResponse(
-        request=request, name="partials/job_row.html",
-        context={"job": job}
-    )
+    partial = "partials/job_actions.html" if source == "detail" else "partials/job_row.html"
+    return templates.TemplateResponse(request=request, name=partial, context={"job": job})
 
 
 @app.post("/job/{job_id}/optimize", response_class=HTMLResponse)
-async def optimize(request: Request, job_id: int):
+async def optimize(request: Request, job_id: int, source: str = Form(default="list")):
     with get_session() as session:
         app_record = session.query(ApplicationORM).filter(ApplicationORM.job_id == job_id).first()
 
@@ -156,8 +154,9 @@ async def optimize(request: Request, job_id: int):
                 .filter(JobListingORM.id == job_id)
                 .first()
             )
+        partial = "partials/job_actions.html" if source == "detail" else "partials/job_row.html"
         return templates.TemplateResponse(
-            request=request, name="partials/job_row.html",
+            request=request, name=partial,
             context={"job": job, "error": "No job description available — cannot optimize."}
         )
 
@@ -233,10 +232,8 @@ async def optimize(request: Request, job_id: int):
             .first()
         )
 
-    return templates.TemplateResponse(
-        request=request, name="partials/job_row.html",
-        context={"job": job}
-    )
+    partial = "partials/job_actions.html" if source == "detail" else "partials/job_row.html"
+    return templates.TemplateResponse(request=request, name=partial, context={"job": job})
 
 @app.get("/download/{job_id}/resume")
 async def download_resume(job_id: int):

@@ -54,30 +54,7 @@
     <!-- Right: actions + optimization -->
     <div style="display:flex;flex-direction:column;gap:1rem;">
 
-        <!-- Actions card -->
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem;">
-            <h3 style="font-size:0.78rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:0.85rem;">Actions</h3>
-            <div style="display:flex;flex-direction:column;gap:0.5rem;">
-                <a href="{{ job.job_url }}" target="_blank"
-                   style="display:inline-flex;align-items:center;justify-content:center;gap:0.4rem;padding:0.55rem;border:1px solid var(--border);border-radius:7px;text-decoration:none;font-size:0.82rem;color:var(--text);background:var(--bg);transition:background 0.15s;">
-                    <i data-lucide="external-link" style="width:13px;height:13px;"></i>
-                    View Original Posting
-                </a>
-
-                {% if status in ["optimized", "approved", "applied"] and job.application.tailored_resume_path %}
-                <a href="/download/{{ job.id }}/resume"
-                   style="display:inline-flex;align-items:center;justify-content:center;gap:0.4rem;padding:0.55rem;border-radius:7px;text-decoration:none;font-size:0.82rem;font-weight:500;color:white;background:var(--accent);transition:background 0.15s;">
-                    <i data-lucide="download" style="width:13px;height:13px;"></i>
-                    Download Resume
-                </a>
-                <a href="/download/{{ job.id }}/cover"
-                   style="display:inline-flex;align-items:center;justify-content:center;gap:0.4rem;padding:0.55rem;border:1px solid var(--border);border-radius:7px;text-decoration:none;font-size:0.82rem;color:var(--text);background:var(--bg);">
-                    <i data-lucide="download" style="width:13px;height:13px;"></i>
-                    Download Cover Letter
-                </a>
-                {% endif %}
-            </div>
-        </div>
+        {% include "partials/job_actions.html" %}
 
         {% if job.application and job.application.optimization_notes %}
         <!-- Optimization notes -->
