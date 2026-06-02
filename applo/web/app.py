@@ -1,6 +1,6 @@
-from fastapi import FastAPI, Request, Form
+from fastapi import FastAPI, Request, Form, UploadFile, File
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from pathlib import Path
 from applo.db import init_db, get_session, JobListingORM, ApplicationORM, save_optimization
 from applo.models import ApplicationStatus
@@ -164,6 +164,7 @@ async def optimize(request: Request, job_id: int):
             None,
             lambda: generator.generate(
                 output_path=resume_path,
+                master_docx_path=settings.master_resume_path,
                 resume_data=resume_data,
                 optimized=result,
             )
@@ -235,6 +236,65 @@ async def download_cover(job_id: int):
         resume_path = app_record.tailored_resume_path
         cover_path = resume_path.replace("_resume.pdf", "_cover.pdf")
     return FileResponse(cover_path, media_type="application/pdf", filename=Path(cover_path).name)
+
+@app.get("/resume/preview")
+async def resume_preview():
+    master = settings.master_resume_path
+    if not master.exists():
+        return HTMLResponse("No master resume uploaded.", status_code=404)
+
+    preview_pdf = master.with_name("master_preview.pdf")
+
+    if not preview_pdf.exists():
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, lambda: _convert_docx_to_preview(master, preview_pdf))
+
+    return FileResponse(preview_pdf, media_type="application/pdf", filename="master_resume_preview.pdf")
+
+
+def _convert_docx_to_preview(docx_path: Path, pdf_path: Path):
+    import subprocess
+    result = subprocess.run(
+        ["libreoffice", "--headless", "--convert-to", "pdf",
+         "--outdir", str(pdf_path.parent), str(docx_path)],
+        capture_output=True, text=True, timeout=60,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"LibreOffice conversion failed: {result.stderr}")
+    converted = pdf_path.parent / (docx_path.stem + ".pdf")
+    if converted != pdf_path:
+        converted.rename(pdf_path)
+
+
+@app.get("/resume/status")
+async def resume_status():
+    exists = settings.master_resume_path.exists()
+    name = settings.master_resume_path.name if exists else None
+    return JSONResponse({"exists": exists, "name": name})
+
+
+@app.post("/resume/upload", response_class=HTMLResponse)
+async def resume_upload(request: Request, file: UploadFile = File(...)):
+    if not file.filename.endswith(".docx"):
+        return HTMLResponse(
+            '<span id="upload-status" style="color:#dc3545;">Only .docx files are supported.</span>',
+            status_code=400,
+        )
+
+    dest = settings.master_resume_path
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    contents = await file.read()
+    dest.write_bytes(contents)
+
+    # Bust parse cache and preview cache so they regenerate from the new file
+    for stale in [dest.with_suffix(".json"), dest.with_name("master_preview.pdf")]:
+        if stale.exists():
+            stale.unlink()
+
+    logger.info(f"Resume | uploaded new master: {file.filename}")
+    return HTMLResponse('<span id="upload-status" style="color:#28a745;">Resume uploaded successfully.</span>')
+
 
 if __name__ == "__main__":
     uvicorn.run("applo.web.app:app", host="0.0.0.0", port=8000, reload=True)

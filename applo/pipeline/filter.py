@@ -31,6 +31,10 @@ class JobFilter:
         return [job for job in listings if self._passes(job)]
 
     def _passes(self, job: JobListing) -> bool:
+        if not job.description or not job.description.strip():
+            logger.debug(f"Filter | no description: {job.title} @ {job.company}")
+            return False
+
         text = f"{job.title} {job.company} {job.raw_text}".lower()
 
         # excluded keywords
