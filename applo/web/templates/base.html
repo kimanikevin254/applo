@@ -73,17 +73,153 @@
             background: #28a745; color: white; padding: 0.5rem 1.2rem;
             border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;
         }
+
+        .header-actions { display: flex; align-items: center; gap: 1rem; }
+
+        .resume-indicator {
+            display: flex; align-items: center; gap: 0.4rem;
+            font-size: 0.8rem; color: rgba(255,255,255,0.7); cursor: pointer;
+            background: none; border: 1px solid rgba(255,255,255,0.25);
+            border-radius: 6px; padding: 0.4rem 0.8rem;
+        }
+        .resume-indicator:hover { background: rgba(255,255,255,0.1); }
+        .resume-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .resume-dot.loaded { background: #28a745; }
+        .resume-dot.missing { background: #dc3545; }
+
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5); z-index: 100;
+            align-items: center; justify-content: center;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: white; border-radius: 10px; padding: 2rem;
+            width: 420px; max-width: 90vw; box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+        .modal h2 { font-size: 1.1rem; margin-bottom: 0.4rem; color: #1a1a2e; }
+        .modal p { font-size: 0.85rem; color: #666; margin-bottom: 1.2rem; }
+        .modal-close {
+            float: right; background: none; border: none;
+            font-size: 1.2rem; cursor: pointer; color: #999; margin-top: -0.2rem;
+        }
+        .upload-area {
+            border: 2px dashed #ddd; border-radius: 8px; padding: 1.5rem;
+            text-align: center; cursor: pointer; transition: border-color 0.2s;
+            position: relative;
+        }
+        .upload-area:hover, .upload-area.dragover { border-color: #1a1a2e; }
+        .upload-area input[type=file] {
+            position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%;
+        }
+        .upload-area-text { font-size: 0.9rem; color: #666; pointer-events: none; }
+        .upload-area-text strong { display: block; color: #1a1a2e; margin-bottom: 0.3rem; }
+        #upload-status { display: block; margin-top: 1rem; font-size: 0.85rem; min-height: 1.2em; }
+        #selected-filename { font-size: 0.8rem; color: #1a1a2e; margin-top: 0.5rem; font-weight: 600; }
+        .upload-submit {
+            margin-top: 1rem; width: 100%; padding: 0.6rem;
+            background: #1a1a2e; color: white; border: none;
+            border-radius: 6px; cursor: pointer; font-size: 0.9rem;
+        }
+        .upload-submit:hover { opacity: 0.85; }
+        .upload-submit:disabled { opacity: 0.5; cursor: not-allowed; }
     </style>
 </head>
 <body>
+    <!-- Resume Upload Modal -->
+    <div class="modal-overlay" id="resume-modal" onclick="closeModal(event)">
+        <div class="modal">
+            <button class="modal-close" onclick="document.getElementById('resume-modal').classList.remove('open')">✕</button>
+            <h2>Master Resume</h2>
+            <p>Upload your base <strong>.docx</strong> resume. It will be used as the template for all optimizations.</p>
+
+            <form id="upload-form"
+                hx-post="/resume/upload"
+                hx-target="#upload-status"
+                hx-swap="outerHTML"
+                hx-encoding="multipart/form-data"
+                hx-on::after-request="onUploadDone(event)">
+
+                <div class="upload-area" id="upload-area">
+                    <input type="file" name="file" accept=".docx" id="resume-file-input"
+                           onchange="onFileSelected(this)">
+                    <div class="upload-area-text">
+                        <strong>Click to choose a file</strong>
+                        or drag and drop here
+                    </div>
+                </div>
+                <div id="selected-filename"></div>
+                <span id="upload-status"></span>
+                <button type="submit" class="upload-submit" id="upload-submit-btn" disabled>Upload Resume</button>
+            </form>
+        </div>
+    </div>
+
     <header>
         <h1><a href="/">⚡ Applo</a></h1>
-        <button class="run-btn" onclick="alert('Run scraper from terminal: python run.py')">
-            Run Scraper
-        </button>
+        <div class="header-actions">
+            <button class="resume-indicator" id="resume-indicator" onclick="document.getElementById('resume-modal').classList.add('open')">
+                <span class="resume-dot" id="resume-dot"></span>
+                <span id="resume-label">Resume</span>
+            </button>
+            <button class="run-btn" onclick="alert('Run scraper from terminal: python run.py')">
+                Run Scraper
+            </button>
+        </div>
     </header>
     <div class="container">
         {% block content %}{% endblock %}
     </div>
+
+    <script>
+        function closeModal(e) {
+            if (e.target === document.getElementById('resume-modal'))
+                document.getElementById('resume-modal').classList.remove('open');
+        }
+
+        function onFileSelected(input) {
+            const name = input.files[0]?.name || '';
+            document.getElementById('selected-filename').textContent = name;
+            document.getElementById('upload-submit-btn').disabled = !name;
+        }
+
+        function onUploadDone(e) {
+            if (e.detail.successful) refreshResumeStatus();
+        }
+
+        function refreshResumeStatus() {
+            fetch('/resume/status')
+                .then(r => r.json())
+                .then(data => {
+                    const dot = document.getElementById('resume-dot');
+                    const label = document.getElementById('resume-label');
+                    if (data.exists) {
+                        dot.className = 'resume-dot loaded';
+                        label.textContent = 'Resume loaded';
+                    } else {
+                        dot.className = 'resume-dot missing';
+                        label.textContent = 'No resume';
+                    }
+                });
+        }
+
+        const uploadArea = document.getElementById('upload-area');
+        uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+        uploadArea.addEventListener('drop', e => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                const input = document.getElementById('resume-file-input');
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                input.files = dt.files;
+                onFileSelected(input);
+            }
+        });
+
+        refreshResumeStatus();
+    </script>
 </body>
 </html>
