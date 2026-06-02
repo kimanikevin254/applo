@@ -33,6 +33,34 @@
     <div style="white-space:pre-wrap; line-height:1.7; color:#444; font-size:0.95rem;">
         {{ job.description or "No description available." }}
     </div>
+
+    {% if job.application and job.application.status.value in ["optimized", "approved", "applied"] %}
+    <hr style="border:none; border-top:1px solid #eee; margin: 1.5rem 0;">
+
+    <h3 style="margin-bottom:1rem;">Optimization Results</h3>
+
+    {% if job.application.optimization_notes %}
+    <div style="background:#f8f9fa; border-left:3px solid #1a1a2e; padding:1rem; margin-bottom:1rem; border-radius:4px;">
+        <strong>What Claude changed:</strong>
+        <p style="margin-top:0.5rem; color:#555; font-size:0.9rem; white-space:pre-wrap;">{{ job.application.optimization_notes }}</p>
+    </div>
+    {% endif %}
+
+    {% if job.application.cover_letter %}
+    <h4 style="margin-bottom:0.5rem;">Cover Letter</h4>
+    <div style="white-space:pre-wrap; line-height:1.7; color:#444; font-size:0.95rem; background:#fafafa; padding:1rem; border-radius:4px;">
+        {{ job.application.cover_letter }}
+    </div>
+    {% endif %}
+
+    {% if job.application.tailored_resume_path %}
+    <div style="margin-top:1rem;">
+        <a href="/download/{{ job.id }}/resume" class="btn btn-primary">⬇ Download Tailored Resume</a>
+        <a href="/download/{{ job.id }}/cover" class="btn btn-secondary" style="margin-left:0.5rem;">⬇ Download Cover Letter</a>
+    </div>
+    {% endif %}
+
+    {% endif %}
 </div>
 
 {% endblock %}
