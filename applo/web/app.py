@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Request, Form
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from pathlib import Path
 from applo.db import init_db, get_session, JobListingORM, ApplicationORM, save_optimization
 from applo.models import ApplicationStatus
@@ -202,6 +201,26 @@ async def optimize(request: Request, job_id: int):
         context={"job": job}
     )
 
+@app.get("/download/{job_id}/resume")
+async def download_resume(job_id: int):
+    with get_session() as session:
+        app_record = session.query(ApplicationORM).filter_by(job_id=job_id).first()
+        if not app_record or not app_record.tailored_resume_path:
+            return HTMLResponse("Resume not found", status_code=404)
+        path = app_record.tailored_resume_path
+    return FileResponse(path, media_type="application/pdf", filename=Path(path).name)
+
+
+@app.get("/download/{job_id}/cover")
+async def download_cover(job_id: int):
+    with get_session() as session:
+        app_record = session.query(ApplicationORM).filter_by(job_id=job_id).first()
+        if not app_record or not app_record.tailored_resume_path:
+            return HTMLResponse("Cover letter not found", status_code=404)
+        # derive cover letter path from resume path
+        resume_path = app_record.tailored_resume_path
+        cover_path = resume_path.replace("_resume.pdf", "_cover.pdf")
+    return FileResponse(cover_path, media_type="application/pdf", filename=Path(cover_path).name)
 
 if __name__ == "__main__":
     uvicorn.run("applo.web.app:app", host="0.0.0.0", port=8000, reload=True)
