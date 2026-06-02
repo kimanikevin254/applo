@@ -58,18 +58,22 @@ Perform a TARGETED rewrite only. Do NOT invent experience or skills the candidat
 
 1. Rewrite the Professional Summary (3-4 sentences) to align with this specific role and company.
 2. Reorder and highlight the most relevant skills from the existing skills list. Do not add new skills.
-3. Rewrite the top 3 most relevant experience bullets to better match the JD language and requirements. Keep the same jobs/companies/dates. Only rewrite bullet points.
+3. Pick the single most relevant job from the experience section. Rewrite up to 3 of its bullet points to better match the JD language and requirements. Do not change bullets from other jobs.
 4. Write a concise cover letter (3 paragraphs) for this role.
 
 Respond ONLY with valid JSON in this exact format, no preamble or markdown:
 {{
   "summary": "rewritten summary here",
   "skills": "rewritten skills section here",
-  "experience_bullets": [
-    "rewritten bullet 1",
-    "rewritten bullet 2",
-    "rewritten bullet 3"
-  ],
+  "experience_bullets": {{
+    "job_title": "exact job title from the resume",
+    "company": "exact company name from the resume",
+    "bullets": [
+      "rewritten bullet 1",
+      "rewritten bullet 2",
+      "rewritten bullet 3"
+    ]
+  }},
   "cover_letter": "full cover letter text here",
   "optimization_notes": "brief explanation of what was changed and why"
 }}"""
