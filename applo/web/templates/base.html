@@ -169,6 +169,26 @@
 
         .optimizing-label { font-size: 0.78rem; color: #2563eb; display: flex; align-items: center; gap: 0.35rem; }
 
+        /* Full-width action buttons (detail page) */
+        .action-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+            padding: 0.55rem; width: 100%; border: 1px solid var(--border);
+            border-radius: 7px; font-size: 0.82rem; font-weight: 500;
+            cursor: pointer; background: var(--bg); color: var(--text); transition: all 0.15s;
+        }
+        .action-btn:hover { background: #f1f5f9; }
+        .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .action-btn-accent  { background: var(--accent); color: white; border-color: var(--accent); }
+        .action-btn-accent:hover  { background: var(--accent-hover); border-color: var(--accent-hover); }
+        .action-btn-success { background: var(--success); color: white; border-color: var(--success); }
+        .action-btn-success:hover { background: #059669; border-color: #059669; }
+        .action-btn-danger  { background: white; color: var(--danger); border-color: #fca5a5; }
+        .action-btn-danger:hover  { background: #fef2f2; }
+        .action-btn-warning { background: white; color: #92400e; border-color: #fcd34d; }
+        .action-btn-warning:hover { background: #fffbeb; }
+
+        #actions-card.htmx-request { opacity: 0.5; pointer-events: none; }
+
         @keyframes spin { to { transform: rotate(360deg); } }
         .spinning { animation: spin 1s linear infinite; display: inline-block; }
 
@@ -355,8 +375,12 @@
         refreshResumeStatus();
 
         function showOptimizing(btn) {
-            const cell = btn.closest('td');
-            cell.innerHTML = '<span class="optimizing-label"><i data-lucide="loader" style="width:13px;height:13px;" class="spinning"></i> Optimizing…</span>';
+            const cell = btn.closest('td') || btn.closest('#actions-card');
+            if (!cell) return;
+            const isCard = cell.id === 'actions-card';
+            cell.innerHTML = isCard
+                ? '<h3 style="font-size:0.78rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:0.85rem;">Actions</h3><div style="display:flex;align-items:center;gap:0.5rem;padding:0.55rem;border-radius:7px;background:#eff6ff;border:1px solid #bfdbfe;font-size:0.82rem;color:#2563eb;"><i data-lucide="loader" style="width:13px;height:13px;" class="spinning"></i> Optimizing your resume…</div>'
+                : '<span class="optimizing-label"><i data-lucide="loader" style="width:13px;height:13px;" class="spinning"></i> Optimizing…</span>';
             lucide.createIcons();
         }
     </script>
