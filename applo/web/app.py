@@ -80,7 +80,8 @@ async def job_detail(request: Request, job_id: int):
 @app.post("/job/{job_id}/status", response_class=HTMLResponse)
 async def update_status(request: Request, job_id: int, status: str = Form(...)):
     with get_session() as session:
-        app_record = session.query(ApplicationORM).filter_by(job_id=job_id).first()
+        app_record = session.query(ApplicationORM).filter(ApplicationORM.job_id == job_id).first()
+
         if not app_record:
             app_record = ApplicationORM(job_id=job_id, status=status)
             session.add(app_record)
@@ -105,7 +106,8 @@ async def update_status(request: Request, job_id: int, status: str = Form(...)):
 @app.post("/job/{job_id}/optimize", response_class=HTMLResponse)
 async def optimize(request: Request, job_id: int):
     with get_session() as session:
-        app_record = session.query(ApplicationORM).filter_by(job_id=job_id).first()
+        app_record = session.query(ApplicationORM).filter(ApplicationORM.job_id == job_id).first()
+
         if not app_record:
             app_record = ApplicationORM(
                 job_id=job_id,
@@ -182,7 +184,8 @@ async def optimize(request: Request, job_id: int):
         logger.error(f"Optimize | failed for job {job_id}: {e}")
         # revert status to pending on failure
         with get_session() as session:
-            app_record = session.query(ApplicationORM).filter_by(job_id=job_id).first()
+            app_record = session.query(ApplicationORM).filter(ApplicationORM.job_id == job_id).first()
+
             if app_record:
                 app_record.status = ApplicationStatus.PENDING
                 session.commit()
@@ -204,7 +207,8 @@ async def optimize(request: Request, job_id: int):
 @app.get("/download/{job_id}/resume")
 async def download_resume(job_id: int):
     with get_session() as session:
-        app_record = session.query(ApplicationORM).filter_by(job_id=job_id).first()
+        app_record = session.query(ApplicationORM).filter(ApplicationORM.job_id == job_id).first()
+
         if not app_record or not app_record.tailored_resume_path:
             return HTMLResponse("Resume not found", status_code=404)
         path = app_record.tailored_resume_path
@@ -214,7 +218,8 @@ async def download_resume(job_id: int):
 @app.get("/download/{job_id}/cover")
 async def download_cover(job_id: int):
     with get_session() as session:
-        app_record = session.query(ApplicationORM).filter_by(job_id=job_id).first()
+        app_record = session.query(ApplicationORM).filter(ApplicationORM.job_id == job_id).first()
+
         if not app_record or not app_record.tailored_resume_path:
             return HTMLResponse("Cover letter not found", status_code=404)
         # derive cover letter path from resume path
