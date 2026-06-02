@@ -30,20 +30,22 @@
                 <button class="icon-btn icon-btn-accent" data-tip="Optimize"
                     hx-post="/job/{{ job.id }}/optimize"
                     hx-target="#job-{{ job.id }}"
-                    hx-swap="outerHTML">
+                    hx-swap="outerHTML"
+                    hx-on:htmx:before-request="showOptimizing(this)">
                     <i data-lucide="sparkles" style="width:14px;height:14px;"></i>
                 </button>
                 <button class="icon-btn icon-btn-danger" data-tip="Not Interested"
                     hx-post="/job/{{ job.id }}/status"
                     hx-vals='{"status": "not_interested"}'
                     hx-target="#job-{{ job.id }}"
-                    hx-swap="outerHTML">
+                    hx-swap="outerHTML"
+                    hx-disabled-elt="closest tr">
                     <i data-lucide="x" style="width:14px;height:14px;"></i>
                 </button>
 
             {% elif status == "optimizing" %}
                 <span class="optimizing-label">
-                    <i data-lucide="loader" style="width:13px;height:13px;"></i>
+                    <i data-lucide="loader" style="width:13px;height:13px;" class="spinning"></i>
                     Optimizing…
                 </span>
 
@@ -52,14 +54,16 @@
                     hx-post="/job/{{ job.id }}/status"
                     hx-vals='{"status": "approved"}'
                     hx-target="#job-{{ job.id }}"
-                    hx-swap="outerHTML">
+                    hx-swap="outerHTML"
+                    hx-disabled-elt="closest tr">
                     <i data-lucide="check" style="width:14px;height:14px;"></i>
                 </button>
                 <button class="icon-btn icon-btn-danger" data-tip="Not Interested"
                     hx-post="/job/{{ job.id }}/status"
                     hx-vals='{"status": "not_interested"}'
                     hx-target="#job-{{ job.id }}"
-                    hx-swap="outerHTML">
+                    hx-swap="outerHTML"
+                    hx-disabled-elt="closest tr">
                     <i data-lucide="x" style="width:14px;height:14px;"></i>
                 </button>
 
@@ -68,14 +72,16 @@
                     hx-post="/job/{{ job.id }}/status"
                     hx-vals='{"status": "applied"}'
                     hx-target="#job-{{ job.id }}"
-                    hx-swap="outerHTML">
+                    hx-swap="outerHTML"
+                    hx-disabled-elt="closest tr">
                     <i data-lucide="send" style="width:14px;height:14px;"></i>
                 </button>
                 <button class="icon-btn icon-btn-danger" data-tip="Not Interested"
                     hx-post="/job/{{ job.id }}/status"
                     hx-vals='{"status": "not_interested"}'
                     hx-target="#job-{{ job.id }}"
-                    hx-swap="outerHTML">
+                    hx-swap="outerHTML"
+                    hx-disabled-elt="closest tr">
                     <i data-lucide="x" style="width:14px;height:14px;"></i>
                 </button>
 
@@ -84,7 +90,8 @@
                     hx-post="/job/{{ job.id }}/status"
                     hx-vals='{"status": "pending"}'
                     hx-target="#job-{{ job.id }}"
-                    hx-swap="outerHTML">
+                    hx-swap="outerHTML"
+                    hx-disabled-elt="closest tr">
                     <i data-lucide="rotate-ccw" style="width:14px;height:14px;"></i>
                 </button>
 
@@ -93,7 +100,8 @@
                     hx-post="/job/{{ job.id }}/status"
                     hx-vals='{"status": "rejected"}'
                     hx-target="#job-{{ job.id }}"
-                    hx-swap="outerHTML">
+                    hx-swap="outerHTML"
+                    hx-disabled-elt="closest tr">
                     <i data-lucide="thumbs-down" style="width:14px;height:14px;"></i>
                 </button>
             {% endif %}
