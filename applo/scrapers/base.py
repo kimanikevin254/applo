@@ -4,7 +4,12 @@ from playwright_stealth import Stealth
 from applo.models import JobListing, SearchCriteria
 from applo.config import settings
 from applo.utils.logger import logger
+from typing import Callable, Awaitable
 import asyncio
+
+
+async def _noop_emit(event: dict) -> None:
+    pass
 
 
 class BaseScraper(ABC):
@@ -13,6 +18,7 @@ class BaseScraper(ABC):
         self.delay = settings.scraper_delay_secs
         self._stealth_ctx = None
         self._playwright = None
+        self.emit: Callable[[dict], Awaitable[None]] = _noop_emit
 
     async def __aenter__(self):
         self._stealth_ctx = Stealth().use_async(async_playwright())
