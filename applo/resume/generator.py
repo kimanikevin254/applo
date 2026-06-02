@@ -20,6 +20,55 @@ def _set_paragraph_text(para, new_text: str):
         para.add_run(new_text)
 
 
+def _patch_job_bullets(
+    paragraphs: list,
+    exp_indices: list[int],
+    target_company: str,
+    target_title: str,
+    new_bullets: list[str],
+) -> None:
+    """Find the target job block in the experience section and replace its bullets."""
+    # Find the paragraph index (within exp_indices) where the target job header appears
+    job_start = None
+    for pos, idx in enumerate(exp_indices):
+        text = paragraphs[idx].text.lower()
+        if target_company and target_company in text:
+            job_start = pos
+            break
+        if target_title and target_title in text:
+            job_start = pos
+            break
+
+    if job_start is None:
+        return
+
+    # Collect bullet paragraphs belonging to this job (until the next non-bullet, non-empty line)
+    bullet_count = 0
+    in_job = False
+    for pos in range(job_start, len(exp_indices)):
+        idx = exp_indices[pos]
+        text = paragraphs[idx].text.strip()
+
+        if not text:
+            continue
+
+        is_bullet = any(text.startswith(c) for c in BULLET_CHARS)
+
+        if pos == job_start:
+            in_job = True
+            continue  # this is the header line, skip
+
+        if in_job:
+            if is_bullet:
+                if bullet_count < len(new_bullets):
+                    prefix = text[0]
+                    _set_paragraph_text(paragraphs[idx], f"{prefix} {new_bullets[bullet_count]}")
+                    bullet_count += 1
+            else:
+                # hit the next job header — stop
+                break
+
+
 def _to_pdf(docx_path: Path, pdf_path: Path) -> Path:
     result = subprocess.run(
         [
@@ -76,23 +125,18 @@ class ResumeGenerator:
             for i, idx in enumerate(skills_indices):
                 _set_paragraph_text(paragraphs[idx], skill_lines[i] if i < len(skill_lines) else "")
 
-        # --- Experience bullets (top 3) ---
+        # --- Experience bullets ---
         exp_indices = (
             para_map.get("professional experience")
             or para_map.get("work experience")
             or para_map.get("experience", [])
         )
-        new_bullets = optimized.get("experience_bullets", [])
-        bullet_count = 0
-        for idx in exp_indices:
-            if bullet_count >= len(new_bullets):
-                break
-            para = paragraphs[idx]
-            text = para.text.strip()
-            if any(text.startswith(c) for c in BULLET_CHARS):
-                prefix = text[0]
-                _set_paragraph_text(para, f"{prefix} {new_bullets[bullet_count]}")
-                bullet_count += 1
+        bullet_data = optimized.get("experience_bullets", {})
+        if isinstance(bullet_data, dict) and exp_indices:
+            target_company = (bullet_data.get("company") or "").lower()
+            target_title = (bullet_data.get("job_title") or "").lower()
+            new_bullets = bullet_data.get("bullets", [])
+            _patch_job_bullets(paragraphs, exp_indices, target_company, target_title, new_bullets)
 
         doc.save(docx_out)
         return _to_pdf(docx_out, output_path)
