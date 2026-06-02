@@ -1,6 +1,6 @@
-from fastapi import FastAPI, Request, Form, UploadFile, File
+from fastapi import FastAPI, Request, Form, UploadFile, File, Query
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, StreamingResponse
 from pathlib import Path
 from applo.db import init_db, get_session, JobListingORM, ApplicationORM, save_optimization, save_listings
 from applo.models import ApplicationStatus, SearchCriteria
@@ -17,6 +17,7 @@ from datetime import datetime
 from typing import Annotated
 import uvicorn
 import asyncio
+import json
 
 BASE_DIR = Path(__file__).parent
 
@@ -132,6 +133,55 @@ async def run_scrape(request: Request, sources: Annotated[list[str], Form()] = [
         request=request, name="partials/job_list.html",
         context={"jobs": jobs}
     )
+
+
+@app.get("/scrape-stream")
+async def scrape_stream(sources: list[str] = Query(...)):
+    async def generate():
+        queue: asyncio.Queue = asyncio.Queue()
+
+        async def emit(event: dict):
+            await queue.put(json.dumps(event))
+
+        criteria = SearchCriteria(
+            job_titles=settings.job_titles,
+            locations=settings.locations,
+            excluded_keywords=settings.excluded_keywords,
+            min_salary=settings.min_salary,
+            sources=sources,
+            max_age_days=settings.scraper_max_age_days,
+        )
+
+        async def run_one(name: str) -> list:
+            scraper_cls = ScraperRegistry.get(name)
+            async with scraper_cls() as scraper:
+                scraper.emit = emit
+                return await scraper.scrape(criteria)
+
+        tasks = [asyncio.create_task(run_one(s)) for s in sources]
+        all_listings = []
+        pending = set(tasks)
+
+        while pending:
+            while not queue.empty():
+                yield f"data: {queue.get_nowait()}\n\n"
+            done, pending = await asyncio.wait(pending, timeout=0.05)
+            for t in done:
+                try:
+                    all_listings.extend(t.result())
+                except Exception as e:
+                    yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+        while not queue.empty():
+            yield f"data: {queue.get_nowait()}\n\n"
+
+        filtered = JobFilter(criteria).run(all_listings)
+        with get_session() as session:
+            saved, skipped = save_listings(session, filtered)
+
+        yield f"data: {json.dumps({'type': 'done', 'saved': saved, 'skipped': skipped})}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.get("/job/{job_id}", response_class=HTMLResponse)

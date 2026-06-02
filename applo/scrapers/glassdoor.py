@@ -19,11 +19,13 @@ class GlassdoorScraper(BaseScraper):
         for title in criteria.job_titles:
             for location in criteria.locations:
                 logger.info(f"Glassdoor | scraping: '{title}' in '{location}'")
+                await self.emit({"type": "start", "source": "glassdoor", "title": title, "location": location})
                 page = await self.new_page()
                 try:
                     results = await self._scrape_page(page, title, location, criteria.max_age_days)
                     listings.extend(results)
                     logger.info(f"Glassdoor | found {len(results)} listings")
+                    await self.emit({"type": "source_done", "source": "glassdoor", "count": len(results)})
                 except Exception as e:
                     logger.error(f"Glassdoor | failed for '{title}' in '{location}': {e}")
                 finally:
@@ -69,6 +71,7 @@ class GlassdoorScraper(BaseScraper):
         await page.wait_for_timeout(3000)
 
         cards = await page.query_selector_all('[data-test="jobListing"]')
+        await self.emit({"type": "found", "source": "glassdoor", "count": len(cards)})
 
         # PASS 1: extract metadata from all cards first
         card_data = []
@@ -111,8 +114,10 @@ class GlassdoorScraper(BaseScraper):
         # PASS 2: click each card and extract JD from side panel
         listings = []
         cards = await page.query_selector_all('[data-test="jobListing"]')
+        total = len(card_data)
 
-        for data in card_data:
+        for i, data in enumerate(card_data, 1):
+            await self.emit({"type": "detail", "source": "glassdoor", "index": i, "total": total, "title": data["job_title"], "company": data["company"]})
             description = ""
             try:
                 # find matching card by href and click it
