@@ -97,3 +97,14 @@ def save_listings(session: Session, listings: list[JobListing]) -> tuple[int, in
         saved += 1
     session.commit()
     return saved, skipped
+
+def save_optimization(session: Session, job_id: int, tailored_resume_path: str, cover_letter: str, notes: str) -> None:
+    app_record = session.query(ApplicationORM).filter(job_id=job_id).first()
+    if not app_record:
+        app_record = ApplicationORM(job_id=job_id)
+        session.add(app_record)
+    app_record.status = ApplicationStatus.OPTIMIZED
+    app_record.tailored_resume_path = tailored_resume_path
+    app_record.cover_letter = cover_letter
+    app_record.optimization_notes = notes
+    session.commit()
