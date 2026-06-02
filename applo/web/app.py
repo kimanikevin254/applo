@@ -71,6 +71,15 @@ async def job_detail(request: Request, job_id: int):
         )
         if not job:
             return HTMLResponse("Job not found", status_code=404)
+
+        # force load the relationship while session is open
+        _ = job.application
+        if job.application:
+            _ = job.application.status
+            _ = job.application.tailored_resume_path
+            _ = job.application.cover_letter
+            _ = job.application.optimization_notes
+
     return templates.TemplateResponse(
         request=request, name="job_detail.html",
         context={"job": job}
