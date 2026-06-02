@@ -54,9 +54,15 @@ async def index(request: Request, status: str = "all"):
 
         jobs = query.all()
 
+    with get_session() as session:
+        all_apps = session.query(ApplicationORM).all()
+        stats = {s.value: 0 for s in ApplicationStatus}
+        for a in all_apps:
+            stats[a.status.value] = stats.get(a.status.value, 0) + 1
+
     return templates.TemplateResponse(
         request=request, name="index.html",
-        context={"jobs": jobs, "current_status": status, "statuses": [s.value for s in ApplicationStatus]}
+        context={"jobs": jobs, "current_status": status, "statuses": [s.value for s in ApplicationStatus], "stats": stats}
     )
 
 
