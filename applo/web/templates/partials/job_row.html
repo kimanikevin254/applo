@@ -5,7 +5,7 @@
             <a href="/job/{{ job.id }}">{{ job.title }}</a>
         </div>
         <div class="job-meta">
-            <span class="badge badge-{{ job.source.value }}">{{ job.source.value }}</span>
+            <span class="badge badge-{{ job.source }}">{{ job.source }}</span>
             <span class="meta-dot"></span>
             <span class="job-company">{{ job.company }}</span>
             {% if job.location %}
