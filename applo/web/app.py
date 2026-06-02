@@ -59,6 +59,10 @@ async def index(request: Request, status: str = "all"):
         stats = {s.value: 0 for s in ApplicationStatus}
         for a in all_apps:
             stats[a.status.value] = stats.get(a.status.value, 0) + 1
+        # jobs with no application record are implicitly pending
+        total_jobs = session.query(JobListingORM).count()
+        jobs_with_app = session.query(ApplicationORM).count()
+        stats["pending"] += total_jobs - jobs_with_app
 
     return templates.TemplateResponse(
         request=request, name="index.html",
