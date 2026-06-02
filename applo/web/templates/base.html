@@ -169,6 +169,11 @@
 
         .optimizing-label { font-size: 0.78rem; color: #2563eb; display: flex; align-items: center; gap: 0.35rem; }
 
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinning { animation: spin 1s linear infinite; display: inline-block; }
+
+        tr.htmx-request td { opacity: 0.5; pointer-events: none; }
+
         .empty { text-align: center; padding: 4rem; color: var(--muted); }
         .empty svg { margin-bottom: 0.75rem; color: #cbd5e1; }
         .empty p { font-size: 0.9rem; }
@@ -348,6 +353,12 @@
             });
         }
         refreshResumeStatus();
+
+        function showOptimizing(btn) {
+            const cell = btn.closest('td');
+            cell.innerHTML = '<span class="optimizing-label"><i data-lucide="loader" style="width:13px;height:13px;" class="spinning"></i> Optimizing…</span>';
+            lucide.createIcons();
+        }
     </script>
 </body>
 </html>
