@@ -29,13 +29,17 @@
 
         /* Header */
         header {
-            background: var(--navy); height: 56px;
+            background: var(--navy-light); height: 56px;
             display: flex; align-items: center; justify-content: space-between;
-            padding: 0 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.06);
+            padding: 0 1.5rem; border-bottom: 1px solid rgba(226,232,240,0.08);
             position: sticky; top: 0; z-index: 40;
         }
         .logo { display: flex; align-items: center; gap: 0.5rem; color: white; text-decoration: none; font-weight: 600; font-size: 1rem; letter-spacing: -0.01em; }
-        .logo svg { color: #6366f1; }
+        .logo .logo-icon {
+            display: flex; align-items: center; justify-content: center;
+            width: 28px; height: 28px; border-radius: 7px;
+            background: rgba(99,102,241,0.2); color: #818cf8;
+        }
         .header-right { display: flex; align-items: center; gap: 0.75rem; }
 
         /* Resume dropdown */
@@ -330,7 +334,7 @@
 
     <header>
         <a href="/" class="logo">
-            <i data-lucide="zap" style="width:18px;height:18px;"></i>
+            <span class="logo-icon"><i data-lucide="zap" style="width:15px;height:15px;"></i></span>
             Applo
         </a>
         <div class="header-right">
