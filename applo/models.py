@@ -3,10 +3,6 @@ from enum import Enum
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
-class JobSource(str, Enum):
-    INDEED = "indeed"
-    GLASSDOOR = "glassdoor"
-
 class ApplicationStatus(str, Enum):
     PENDING = "pending"           # scraped, awaiting user review
     OPTIMIZING = "optimizing"     # Claude is generating tailored resume
@@ -18,7 +14,7 @@ class ApplicationStatus(str, Enum):
 
 class JobListing(BaseModel):
     id: Optional[int] = None
-    source: JobSource
+    source: str
     external_id: str                        # indeed/glassdoor job id
     title: str
     company: str
@@ -29,7 +25,7 @@ class JobListing(BaseModel):
     description: Optional[str] = None      # fetched separately
     raw_text: str                           # full card text as scraped
     posted_text: Optional[str] = None
-    scraped_at: datetime = Field(default_factory=datetime.now(timezone.utc))
+    scraped_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_duplicate: bool = False
 
 class Application(BaseModel):
@@ -48,7 +44,7 @@ class SearchCriteria(BaseModel):
     locations: list[str] = ["remote"]
     excluded_keywords: list[str] = []
     min_salary: Optional[int] = None
-    sources: list[JobSource] = [JobSource.INDEED, JobSource.GLASSDOOR]
+    sources: list[str] = ["indeed", "glassdoor"]
     max_age_days: int = 1
 
     @field_validator("max_age_days")

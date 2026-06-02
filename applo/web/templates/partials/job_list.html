@@ -1,0 +1,12 @@
+<tbody id="job-list">
+    {% for job in jobs %}
+        {% include "partials/job_row.html" %}
+    {% else %}
+        <tr>
+            <td colspan="4" class="empty">
+                <div><i data-lucide="inbox" style="width:32px;height:32px;"></i></div>
+                <p>No jobs found.</p>
+            </td>
+        </tr>
+    {% endfor %}
+</tbody>

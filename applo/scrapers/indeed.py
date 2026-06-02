@@ -1,12 +1,14 @@
 from playwright.async_api import Page
-from applo.models import JobListing, JobSource, SearchCriteria
+from applo.models import JobListing, SearchCriteria
 from applo.utils.logger import logger
 from applo.scrapers.base import BaseScraper
+from applo.scrapers.registry import ScraperRegistry
 from datetime import datetime, timezone
 import hashlib
 import asyncio
 
 
+@ScraperRegistry.register("indeed")
 class IndeedScraper(BaseScraper):
     BASE_URL = "https://www.indeed.com/jobs"
 
@@ -100,7 +102,7 @@ class IndeedScraper(BaseScraper):
             salary_min, salary_max = self._parse_salary(data["salary_text"])
 
             listings.append(JobListing(
-                source=JobSource.INDEED,
+                source="indeed",
                 external_id=data["external_id"],
                 title=data["job_title"].strip(),
                 company=data["company"].strip(),

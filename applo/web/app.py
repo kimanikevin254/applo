@@ -2,16 +2,19 @@ from fastapi import FastAPI, Request, Form, UploadFile, File
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from pathlib import Path
-from applo.db import init_db, get_session, JobListingORM, ApplicationORM, save_optimization
-from applo.models import ApplicationStatus
+from applo.db import init_db, get_session, JobListingORM, ApplicationORM, save_optimization, save_listings
+from applo.models import ApplicationStatus, SearchCriteria
 from applo.utils.logger import logger
 from applo.config import settings
 from applo.pipeline.optimizer import ResumeOptimizer
+from applo.pipeline.filter import JobFilter
 from applo.resume.generator import ResumeGenerator
 from applo.resume.parser import load_or_parse_resume
+from applo.scrapers import ScraperRegistry
 from sqlalchemy.orm import joinedload
 from contextlib import asynccontextmanager
 from datetime import datetime
+from typing import Annotated
 import uvicorn
 import asyncio
 
@@ -66,7 +69,68 @@ async def index(request: Request, status: str = "all"):
 
     return templates.TemplateResponse(
         request=request, name="index.html",
-        context={"jobs": jobs, "current_status": status, "statuses": [s.value for s in ApplicationStatus], "stats": stats}
+        context={
+            "jobs": jobs,
+            "current_status": status,
+            "statuses": [s.value for s in ApplicationStatus],
+            "stats": stats,
+            "scrapers": list(ScraperRegistry.list_all().keys()),
+        }
+    )
+
+
+@app.post("/scrape", response_class=HTMLResponse)
+async def run_scrape(request: Request, sources: Annotated[list[str], Form()] = []):
+    if not sources:
+        return HTMLResponse(
+            '<tbody id="job-list"><tr><td colspan="4" class="empty"><p>Select at least one source.</p></td></tr></tbody>'
+        )
+
+    criteria = SearchCriteria(
+        job_titles=settings.job_titles,
+        locations=settings.locations,
+        excluded_keywords=settings.excluded_keywords,
+        min_salary=settings.min_salary,
+        sources=sources,
+        max_age_days=settings.scraper_max_age_days,
+    )
+
+    async def run_scraper(name: str):
+        scraper_cls = ScraperRegistry.get(name)
+        async with scraper_cls() as scraper:
+            return await scraper.scrape(criteria)
+
+    results = await asyncio.gather(*[run_scraper(s) for s in sources], return_exceptions=True)
+
+    all_listings = []
+    for name, result in zip(sources, results):
+        if isinstance(result, Exception):
+            logger.error(f"Scrape | {name} failed: {result}")
+        else:
+            all_listings.extend(result)
+
+    filtered = JobFilter(criteria).run(all_listings)
+    with get_session() as session:
+        saved, skipped = save_listings(session, filtered)
+
+    logger.info(f"Scrape | saved={saved} skipped={skipped}")
+
+    with get_session() as session:
+        jobs = (
+            session.query(JobListingORM)
+            .outerjoin(ApplicationORM)
+            .options(joinedload(JobListingORM.application))
+            .filter(
+                (ApplicationORM.status != ApplicationStatus.NOT_INTERESTED) |
+                (ApplicationORM.id == None)
+            )
+            .order_by(JobListingORM.scraped_at.desc())
+            .all()
+        )
+
+    return templates.TemplateResponse(
+        request=request, name="partials/job_list.html",
+        context={"jobs": jobs}
     )
 
 
@@ -92,7 +156,7 @@ async def job_detail(request: Request, job_id: int):
 
     return templates.TemplateResponse(
         request=request, name="job_detail.html",
-        context={"job": job}
+        context={"job": job, "scrapers": list(ScraperRegistry.list_all().keys())}
     )
 
 

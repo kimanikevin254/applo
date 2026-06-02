@@ -1,7 +1,8 @@
 from playwright.async_api import Page
-from applo.models import JobListing, JobSource, SearchCriteria
+from applo.models import JobListing, SearchCriteria
 from applo.utils.logger import logger
 from applo.scrapers.base import BaseScraper
+from applo.scrapers.registry import ScraperRegistry
 from applo.config import settings
 from datetime import datetime, timezone
 import hashlib
@@ -9,6 +10,7 @@ import asyncio
 import re
 
 
+@ScraperRegistry.register("glassdoor")
 class GlassdoorScraper(BaseScraper):
     BASE_URL = "https://www.glassdoor.com/Job/jobs.htm"
 
@@ -149,7 +151,7 @@ class GlassdoorScraper(BaseScraper):
             salary_min, salary_max = self._parse_salary(data["salary_text"])
 
             listings.append(JobListing(
-                source=JobSource.GLASSDOOR,
+                source="glassdoor",
                 external_id=external_id,
                 title=data["job_title"].strip(),
                 company=data["company"].strip(),

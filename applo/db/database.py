@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Session, relationship
 from sqlalchemy.sql import func
 from datetime import datetime, timezone
 from applo.config import settings
-from applo.models import JobSource, ApplicationStatus, JobListing
+from applo.models import ApplicationStatus, JobListing
 from applo.utils.logger import logger
 
 engine = create_engine(
@@ -22,7 +22,7 @@ class JobListingORM(Base):
     __tablename__  = "job_listings"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    source = Column(SAEnum(JobSource), nullable=False)
+    source = Column(String, nullable=False)
     external_id = Column(String, nullable=False)
     title = Column(String, nullable=False)
     company = Column(String, nullable=False)
@@ -63,7 +63,6 @@ def get_session() -> Session:
 
 def is_duplicate(session: Session, source: str, external_id: str) -> bool:
     """Check if job already exists in DB by source + external_id."""
-    from applo.models import JobSource
     result = session.query(JobListingORM).filter_by(
         source=source,
         external_id=external_id,
