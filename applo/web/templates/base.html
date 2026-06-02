@@ -257,6 +257,25 @@
         .htmx-request .htmx-indicator { display: flex; }
         .scraper-spinner { align-items: center; gap: 0.4rem; color: #2563eb; font-size: 0.82rem; }
 
+        /* Criteria fields */
+        .criteria-fields { display: flex; flex-direction: column; gap: 0.55rem; margin-bottom: 0.85rem; }
+        .criteria-field { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
+        .criteria-field label { font-size: 0.75rem; font-weight: 600; color: var(--text); }
+        .criteria-hint { font-weight: 400; color: var(--muted); }
+        .criteria-input {
+            padding: 0.38rem 0.6rem; border: 1px solid var(--border); border-radius: 6px;
+            font-size: 0.82rem; color: var(--text); background: var(--surface); width: 100%;
+            font-family: inherit;
+        }
+        .criteria-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(99,102,241,0.1); }
+        .criteria-row { display: flex; gap: 0.6rem; }
+        .criteria-divider {
+            font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.06em; color: var(--muted); margin: 0.6rem 0 0.4rem;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        .criteria-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
         /* Scraper log */
         .scraper-log {
             max-height: 180px; overflow-y: auto; font-size: 0.75rem;
@@ -285,11 +304,42 @@
 
             <form id="scraper-form" onsubmit="submitScraper(event)">
 
+                <div class="criteria-fields">
+                    <div class="criteria-field">
+                        <label>Job Titles <span class="criteria-hint">comma-separated</span></label>
+                        <input type="text" id="crit-titles" class="criteria-input" placeholder="software engineer, backend engineer">
+                    </div>
+                    <div class="criteria-field">
+                        <label>Locations <span class="criteria-hint">comma-separated</span></label>
+                        <input type="text" id="crit-locations" class="criteria-input" placeholder="remote, New York NY">
+                    </div>
+                    <div class="criteria-field">
+                        <label>Excluded Keywords <span class="criteria-hint">comma-separated</span></label>
+                        <input type="text" id="crit-excluded" class="criteria-input" placeholder="senior, staff, principal">
+                    </div>
+                    <div class="criteria-row">
+                        <div class="criteria-field">
+                            <label>Min Salary</label>
+                            <input type="number" id="crit-salary" class="criteria-input" placeholder="e.g. 80000" step="5000" min="0">
+                        </div>
+                        <div class="criteria-field">
+                            <label>Max Age</label>
+                            <select id="crit-age" class="criteria-input">
+                                <option value="1">1 day</option>
+                                <option value="3">3 days</option>
+                                <option value="7">7 days</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="criteria-divider">Sources</div>
+
                 <div class="scraper-sources" id="scraper-sources">
                     <!-- populated by JS from window.scraperSources -->
                 </div>
 
-                <button type="submit" class="upload-submit" id="scraper-run-btn">
+                <button type="submit" class="upload-submit" id="scraper-run-btn" style="margin-top:0.85rem;">
                     <i data-lucide="play" style="width:13px;height:13px;"></i>
                     Run Scraper
                 </button>
@@ -435,7 +485,7 @@
         refreshResumeStatus();
 
         // Scraper modal
-        function openScraperModal() {
+        async function openScraperModal() {
             const container = document.getElementById('scraper-sources');
             container.innerHTML = '';
             (window.scraperSources || []).forEach(name => {
@@ -446,6 +496,14 @@
             });
             document.getElementById('scraper-log').innerHTML = '';
             document.getElementById('scraper-run-btn').disabled = false;
+
+            const cfg = await fetch('/search-config').then(r => r.json());
+            document.getElementById('crit-titles').value = (cfg.job_titles || []).join(', ');
+            document.getElementById('crit-locations').value = (cfg.locations || []).join(', ');
+            document.getElementById('crit-excluded').value = (cfg.excluded_keywords || []).join(', ');
+            document.getElementById('crit-salary').value = cfg.min_salary || '';
+            document.getElementById('crit-age').value = cfg.max_age_days || 1;
+
             document.getElementById('scraper-modal').classList.add('open');
             lucide.createIcons();
         }
@@ -453,10 +511,19 @@
             if (e.target === document.getElementById('scraper-modal'))
                 document.getElementById('scraper-modal').classList.remove('open');
         }
-        function submitScraper(e) {
+        async function submitScraper(e) {
             e.preventDefault();
             const sources = [...document.querySelectorAll('#scraper-sources input:checked')].map(el => el.value);
             if (!sources.length) return;
+
+            const cfg = {
+                job_titles: document.getElementById('crit-titles').value.split(',').map(s => s.trim()).filter(Boolean),
+                locations: document.getElementById('crit-locations').value.split(',').map(s => s.trim()).filter(Boolean),
+                excluded_keywords: document.getElementById('crit-excluded').value.split(',').map(s => s.trim()).filter(Boolean),
+                min_salary: parseInt(document.getElementById('crit-salary').value) || null,
+                max_age_days: parseInt(document.getElementById('crit-age').value),
+            };
+            await fetch('/search-config', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(cfg) });
 
             const log = document.getElementById('scraper-log');
             log.innerHTML = '';
