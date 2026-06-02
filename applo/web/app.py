@@ -164,6 +164,7 @@ async def optimize(request: Request, job_id: int):
             None,
             lambda: generator.generate(
                 output_path=resume_path,
+                master_docx_path=settings.master_resume_path,
                 resume_data=resume_data,
                 optimized=result,
             )
