@@ -3,12 +3,18 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from pathlib import Path
-from applo.db import init_db, get_session, JobListingORM, ApplicationORM
+from applo.db import init_db, get_session, JobListingORM, ApplicationORM, save_optimization
 from applo.models import ApplicationStatus
 from applo.utils.logger import logger
+from applo.config import settings
+from applo.pipeline.optimizer import ResumeOptimizer
+from applo.resume.generator import ResumeGenerator
+from applo.resume.parser import load_or_parse_resume
 from sqlalchemy.orm import joinedload
 from contextlib import asynccontextmanager
+from datetime import datetime
 import uvicorn
+import asyncio
 
 BASE_DIR = Path(__file__).parent
 
@@ -117,9 +123,79 @@ async def optimize(request: Request, job_id: int):
             .filter(JobListingORM.id == job_id)
             .first()
         )
+        job_title = job.title
+        company = job.company
+        description = job.description or job.raw_text
 
-    # TODO: trigger optimizer here (next step)
-    logger.info(f"Optimize requested for job {job_id}: {job.title} @ {job.company}")
+    logger.info(f"Optimize | starting for job {job_id}: {job.title} @ {job.company}")
+
+    try:
+        # run optimizer in thread to avoid blocking the event loop
+        loop = asyncio.get_event_loop()
+        optimizer = ResumeOptimizer()
+        result = await loop.run_in_executor(
+            None,
+            lambda: optimizer.optimize(job_title, company, description)
+        )
+
+        if not result:
+            raise ValueError("Optimizer returned empty result")
+
+        # generate PDFs
+        resume_data = load_or_parse_resume(settings.master_resume_path)
+        generator = ResumeGenerator()
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_company = company.replace(" ", "_").replace("/", "_")[:30]
+
+        resume_path = f"data/output/{job_id}_{safe_company}_{timestamp}_resume.pdf"
+        cover_path = f"data/output/{job_id}_{safe_company}_{timestamp}_cover.pdf"
+
+        await loop.run_in_executor(
+            None,
+            lambda: generator.generate(
+                output_path=resume_path,
+                resume_data=resume_data,
+                optimized=result,
+            )
+        )
+        await loop.run_in_executor(
+            None,
+            lambda: generator.generate_cover_letter(
+                output_path=cover_path,
+                cover_letter_text=result.get("cover_letter", ""),
+                candidate_name=resume_data["sections"].get("header", "").split("\n")[0].strip(),
+            )
+        )
+
+        # save to DB
+        with get_session() as session:
+            save_optimization(
+                session=session,
+                job_id=job_id,
+                tailored_resume_path=resume_path,
+                cover_letter=result.get("cover_letter", ""),
+                notes=result.get("optimization_notes", ""),
+            )
+
+        logger.info(f"Optimize | complete for job {job_id}")
+
+    except Exception as e:
+        logger.error(f"Optimize | failed for job {job_id}: {e}")
+        # revert status to pending on failure
+        with get_session() as session:
+            app_record = session.query(ApplicationORM).filter_by(job_id=job_id).first()
+            if app_record:
+                app_record.status = ApplicationStatus.PENDING
+                session.commit()
+
+    # return updated row
+    with get_session() as session:
+        job = (
+            session.query(JobListingORM)
+            .options(joinedload(JobListingORM.application))
+            .filter(JobListingORM.id == job_id)
+            .first()
+        )
 
     return templates.TemplateResponse(
         request=request, name="partials/job_row.html",
