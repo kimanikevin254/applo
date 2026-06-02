@@ -74,22 +74,48 @@
             border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem;
         }
 
+        /* --- Header actions --- */
         .header-actions { display: flex; align-items: center; gap: 1rem; }
+
+        /* --- Resume dropdown --- */
+        .resume-menu { position: relative; }
 
         .resume-indicator {
             display: flex; align-items: center; gap: 0.4rem;
             font-size: 0.8rem; color: rgba(255,255,255,0.7); cursor: pointer;
             background: none; border: 1px solid rgba(255,255,255,0.25);
             border-radius: 6px; padding: 0.4rem 0.8rem;
+            user-select: none;
         }
         .resume-indicator:hover { background: rgba(255,255,255,0.1); }
+
         .resume-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
         .resume-dot.loaded { background: #28a745; }
         .resume-dot.missing { background: #dc3545; }
 
+        .resume-chevron { font-size: 0.6rem; opacity: 0.6; margin-left: 2px; }
+
+        .resume-dropdown {
+            display: none; position: absolute; top: calc(100% + 8px); right: 0;
+            background: white; border-radius: 8px; min-width: 180px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15); overflow: hidden; z-index: 50;
+        }
+        .resume-dropdown.open { display: block; }
+
+        .dropdown-item {
+            display: flex; align-items: center; gap: 0.6rem;
+            padding: 0.65rem 1rem; font-size: 0.85rem; color: #333;
+            cursor: pointer; text-decoration: none; width: 100%;
+            background: none; border: none; text-align: left;
+        }
+        .dropdown-item:hover { background: #f5f5f5; }
+        .dropdown-item.disabled { color: #bbb; cursor: default; pointer-events: none; }
+        .dropdown-divider { height: 1px; background: #eee; }
+
+        /* --- Upload modal --- */
         .modal-overlay {
             display: none; position: fixed; inset: 0;
-            background: rgba(0,0,0,0.5); z-index: 100;
+            background: rgba(0,0,0,0.45); z-index: 100;
             align-items: center; justify-content: center;
         }
         .modal-overlay.open { display: flex; }
@@ -97,12 +123,17 @@
             background: white; border-radius: 10px; padding: 2rem;
             width: 420px; max-width: 90vw; box-shadow: 0 8px 32px rgba(0,0,0,0.2);
         }
-        .modal h2 { font-size: 1.1rem; margin-bottom: 0.4rem; color: #1a1a2e; }
-        .modal p { font-size: 0.85rem; color: #666; margin-bottom: 1.2rem; }
-        .modal-close {
-            float: right; background: none; border: none;
-            font-size: 1.2rem; cursor: pointer; color: #999; margin-top: -0.2rem;
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            margin-bottom: 0.4rem;
         }
+        .modal h2 { font-size: 1.1rem; color: #1a1a2e; }
+        .modal p { font-size: 0.85rem; color: #666; margin-bottom: 1.4rem; }
+        .modal-close {
+            background: none; border: none; font-size: 1.2rem;
+            cursor: pointer; color: #999; line-height: 1;
+        }
+
         .upload-area {
             border: 2px dashed #ddd; border-radius: 8px; padding: 1.5rem;
             text-align: center; cursor: pointer; transition: border-color 0.2s;
@@ -114,24 +145,29 @@
         }
         .upload-area-text { font-size: 0.9rem; color: #666; pointer-events: none; }
         .upload-area-text strong { display: block; color: #1a1a2e; margin-bottom: 0.3rem; }
-        #upload-status { display: block; margin-top: 1rem; font-size: 0.85rem; min-height: 1.2em; }
-        #selected-filename { font-size: 0.8rem; color: #1a1a2e; margin-top: 0.5rem; font-weight: 600; }
+
+        #selected-filename { font-size: 0.8rem; color: #1a1a2e; margin-top: 0.6rem; font-weight: 600; min-height: 1em; }
+        #upload-status { display: block; margin-top: 0.75rem; font-size: 0.85rem; min-height: 1.2em; }
+
         .upload-submit {
             margin-top: 1rem; width: 100%; padding: 0.6rem;
             background: #1a1a2e; color: white; border: none;
             border-radius: 6px; cursor: pointer; font-size: 0.9rem;
         }
         .upload-submit:hover { opacity: 0.85; }
-        .upload-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+        .upload-submit:disabled { opacity: 0.4; cursor: not-allowed; }
     </style>
 </head>
 <body>
-    <!-- Resume Upload Modal -->
-    <div class="modal-overlay" id="resume-modal" onclick="closeModal(event)">
+
+    <!-- Upload modal -->
+    <div class="modal-overlay" id="upload-modal" onclick="closeUploadModal(event)">
         <div class="modal">
-            <button class="modal-close" onclick="document.getElementById('resume-modal').classList.remove('open')">✕</button>
-            <h2>Master Resume</h2>
-            <p>Upload your base <strong>.docx</strong> resume. It will be used as the template for all optimizations.</p>
+            <div class="modal-header">
+                <h2>Upload Resume</h2>
+                <button class="modal-close" onclick="document.getElementById('upload-modal').classList.remove('open')">✕</button>
+            </div>
+            <p>Upload your base <strong>.docx</strong> file. It will replace the current master resume.</p>
 
             <form id="upload-form"
                 hx-post="/resume/upload"
@@ -158,23 +194,57 @@
     <header>
         <h1><a href="/">⚡ Applo</a></h1>
         <div class="header-actions">
-            <button class="resume-indicator" id="resume-indicator" onclick="document.getElementById('resume-modal').classList.add('open')">
-                <span class="resume-dot" id="resume-dot"></span>
-                <span id="resume-label">Resume</span>
-            </button>
+
+            <!-- Resume indicator + dropdown -->
+            <div class="resume-menu" id="resume-menu">
+                <div class="resume-indicator" id="resume-indicator" onclick="toggleDropdown()">
+                    <span class="resume-dot" id="resume-dot"></span>
+                    <span id="resume-label">Resume</span>
+                    <span class="resume-chevron">▼</span>
+                </div>
+                <div class="resume-dropdown" id="resume-dropdown">
+                    <a class="dropdown-item" id="preview-item" href="/resume/preview" target="_blank">
+                        👁 Preview current
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <button class="dropdown-item" onclick="openUploadModal()">
+                        ↑ Upload new
+                    </button>
+                </div>
+            </div>
+
             <button class="run-btn" onclick="alert('Run scraper from terminal: python run.py')">
                 Run Scraper
             </button>
         </div>
     </header>
+
     <div class="container">
         {% block content %}{% endblock %}
     </div>
 
     <script>
-        function closeModal(e) {
-            if (e.target === document.getElementById('resume-modal'))
-                document.getElementById('resume-modal').classList.remove('open');
+        // --- Dropdown ---
+        function toggleDropdown() {
+            document.getElementById('resume-dropdown').classList.toggle('open');
+        }
+
+        document.addEventListener('click', function(e) {
+            const menu = document.getElementById('resume-menu');
+            if (!menu.contains(e.target)) {
+                document.getElementById('resume-dropdown').classList.remove('open');
+            }
+        });
+
+        // --- Upload modal ---
+        function openUploadModal() {
+            document.getElementById('resume-dropdown').classList.remove('open');
+            document.getElementById('upload-modal').classList.add('open');
+        }
+
+        function closeUploadModal(e) {
+            if (e.target === document.getElementById('upload-modal'))
+                document.getElementById('upload-modal').classList.remove('open');
         }
 
         function onFileSelected(input) {
@@ -187,22 +257,7 @@
             if (e.detail.successful) refreshResumeStatus();
         }
 
-        function refreshResumeStatus() {
-            fetch('/resume/status')
-                .then(r => r.json())
-                .then(data => {
-                    const dot = document.getElementById('resume-dot');
-                    const label = document.getElementById('resume-label');
-                    if (data.exists) {
-                        dot.className = 'resume-dot loaded';
-                        label.textContent = 'Resume loaded';
-                    } else {
-                        dot.className = 'resume-dot missing';
-                        label.textContent = 'No resume';
-                    }
-                });
-        }
-
+        // Drag and drop
         const uploadArea = document.getElementById('upload-area');
         uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
         uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
@@ -218,6 +273,26 @@
                 onFileSelected(input);
             }
         });
+
+        // --- Resume status ---
+        function refreshResumeStatus() {
+            fetch('/resume/status')
+                .then(r => r.json())
+                .then(data => {
+                    const dot = document.getElementById('resume-dot');
+                    const label = document.getElementById('resume-label');
+                    const previewItem = document.getElementById('preview-item');
+                    if (data.exists) {
+                        dot.className = 'resume-dot loaded';
+                        label.textContent = 'Resume loaded';
+                        previewItem.classList.remove('disabled');
+                    } else {
+                        dot.className = 'resume-dot missing';
+                        label.textContent = 'No resume';
+                        previewItem.classList.add('disabled');
+                    }
+                });
+        }
 
         refreshResumeStatus();
     </script>
