@@ -1,4 +1,9 @@
-from .indeed import IndeedScraper
-from .glassdoor import GlassdoorScraper
+from pathlib import Path
+import importlib
 
-__all__ = ["IndeedScraper", "GlassdoorScraper"]
+for _f in Path(__file__).parent.glob("*.py"):
+    if _f.stem not in ("__init__", "base", "registry"):
+        importlib.import_module(f"applo.scrapers.{_f.stem}")
+
+from .registry import ScraperRegistry
+from .base import BaseScraper
