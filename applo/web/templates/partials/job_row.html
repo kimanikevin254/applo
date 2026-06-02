@@ -26,7 +26,12 @@
     </td>
     <td>
         <div class="actions">
-            {% if status == "pending" %}
+            {% if error %}
+                <span style="display:inline-flex;align-items:center;gap:0.35rem;font-size:0.78rem;color:var(--danger);">
+                    <i data-lucide="alert-circle" style="width:13px;height:13px;flex-shrink:0;"></i>
+                    {{ error }}
+                </span>
+            {% elif status == "pending" %}
                 <button class="icon-btn icon-btn-accent" data-tip="Optimize"
                     hx-post="/job/{{ job.id }}/optimize"
                     hx-target="#job-{{ job.id }}"
