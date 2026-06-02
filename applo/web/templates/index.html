@@ -1,33 +1,69 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="filters">
-    <span style="font-size:0.85rem; color:#666; margin-right:0.5rem;">Filter:</span>
-    <a href="/?status=all" class="{% if current_status == 'all' %}active{% endif %}">All</a>
+<!-- Stats strip -->
+<div class="stats-strip">
+    <div class="stat-card">
+        <div>
+            <div class="stat-num">{{ stats.get('pending', 0) }}</div>
+            <div class="stat-label">Pending</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div>
+            <div class="stat-num">{{ stats.get('optimized', 0) }}</div>
+            <div class="stat-label">Optimized</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div>
+            <div class="stat-num">{{ stats.get('approved', 0) }}</div>
+            <div class="stat-label">Approved</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div>
+            <div class="stat-num">{{ stats.get('applied', 0) }}</div>
+            <div class="stat-label">Applied</div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="filter-bar">
+    <a href="/?status=all" class="filter-pill {% if current_status == 'all' %}active{% endif %}">All</a>
     {% for s in statuses %}
-    <a href="/?status={{ s }}" class="{% if current_status == s %}active{% endif %}">
+    <a href="/?status={{ s }}" class="filter-pill {% if current_status == s %}active{% endif %}">
         {{ s.replace('_', ' ').title() }}
     </a>
     {% endfor %}
 </div>
 
-<table>
-    <thead>
-        <tr>
-            <th>Source</th>
-            <th>Job</th>
-            <th>Salary</th>
-            <th>Status</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody id="job-list">
-        {% for job in jobs %}
-            {% include "partials/job_row.html" %}
-        {% else %}
-            <tr><td colspan="5" class="empty">No jobs found.</td></tr>
-        {% endfor %}
-    </tbody>
-</table>
+<!-- Table -->
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Job</th>
+                <th>Salary</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="job-list">
+            {% for job in jobs %}
+                {% include "partials/job_row.html" %}
+            {% else %}
+                <tr>
+                    <td colspan="4" class="empty">
+                        <div><i data-lucide="inbox" style="width:32px;height:32px;"></i></div>
+                        <p>No jobs found.</p>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 
+<script>lucide.createIcons();</script>
 {% endblock %}
