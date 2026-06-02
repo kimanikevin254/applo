@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     glassdoor_auth_modal_timeout: int = 2000
 
     # Resume
-    master_resume_path: Path = Path("data/resumes/master.pdf")
+    master_resume_path: Path = Path("data/resumes/master.docx")
 
     # Search criteria
     job_titles: list[str] = Field(default=["software engineer", "backend_engineer"])
