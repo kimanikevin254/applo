@@ -143,6 +143,20 @@ async def optimize(request: Request, job_id: int):
         company = job.company
         description = job.description or job.raw_text
 
+    if not description or not description.strip():
+        logger.warning(f"Optimize | no description for job {job_id}, aborting")
+        with get_session() as session:
+            job = (
+                session.query(JobListingORM)
+                .options(joinedload(JobListingORM.application))
+                .filter(JobListingORM.id == job_id)
+                .first()
+            )
+        return templates.TemplateResponse(
+            request=request, name="partials/job_row.html",
+            context={"job": job, "error": "No job description available — cannot optimize."}
+        )
+
     logger.info(f"Optimize | starting for job {job_id}: {job.title} @ {job.company}")
 
     try:
