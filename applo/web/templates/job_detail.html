@@ -41,14 +41,6 @@
             </div>
         </div>
 
-        {% if job.application and status in ["optimized", "approved", "applied"] %}
-        {% if job.application.cover_letter %}
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.5rem;">
-            <h3 style="font-size:0.78rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:0.85rem;">Cover Letter</h3>
-            <div style="white-space:pre-wrap;line-height:1.75;color:#374151;font-size:0.875rem;">{{ job.application.cover_letter }}</div>
-        </div>
-        {% endif %}
-        {% endif %}
     </div>
 
     <!-- Right: actions + optimization -->
@@ -62,7 +54,7 @@
             <h3 style="font-size:0.78rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:0.75rem;">
                 <span style="display:flex;align-items:center;gap:0.35rem;">
                     <i data-lucide="sparkles" style="width:13px;height:13px;color:var(--accent);"></i>
-                    What Claude Changed
+                    What Was Optimized
                 </span>
             </h3>
             <p style="font-size:0.82rem;line-height:1.65;color:#4b5563;">{{ job.application.optimization_notes }}</p>

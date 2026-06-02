@@ -107,15 +107,13 @@
 
         {% if status in ["optimized", "approved", "applied"] and job.application and job.application.tailored_resume_path %}
         <div style="height:1px;background:var(--border);margin:0.25rem 0;"></div>
-        <a href="/download/{{ job.id }}/resume"
-           style="display:inline-flex;align-items:center;justify-content:center;gap:0.4rem;padding:0.55rem;border-radius:7px;text-decoration:none;font-size:0.82rem;font-weight:500;color:white;background:var(--accent);">
-            <i data-lucide="download" style="width:13px;height:13px;"></i>
-            Download Resume
+        <a class="action-btn action-btn-accent" href="/preview/{{ job.id }}/resume" target="_blank">
+            <i data-lucide="eye" style="width:13px;height:13px;"></i>
+            Preview Resume
         </a>
-        <a href="/download/{{ job.id }}/cover"
-           style="display:inline-flex;align-items:center;justify-content:center;gap:0.4rem;padding:0.55rem;border:1px solid var(--border);border-radius:7px;text-decoration:none;font-size:0.82rem;color:var(--text);background:var(--bg);">
-            <i data-lucide="download" style="width:13px;height:13px;"></i>
-            Download Cover Letter
+        <a class="action-btn" href="/preview/{{ job.id }}/cover" target="_blank">
+            <i data-lucide="eye" style="width:13px;height:13px;"></i>
+            Preview Cover Letter
         </a>
         {% endif %}
 
