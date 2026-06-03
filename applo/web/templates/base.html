@@ -300,18 +300,35 @@
                     <i data-lucide="x" style="width:16px;height:16px;"></i>
                 </button>
             </div>
-            <p>Model used for resume optimization. Use LiteLLM format:<br>
-                <code style="font-size:0.78rem;background:#f1f5f9;padding:0.1rem 0.35rem;border-radius:4px;">anthropic/claude-haiku-4-5</code> &nbsp;
-                <code style="font-size:0.78rem;background:#f1f5f9;padding:0.1rem 0.35rem;border-radius:4px;">openai/gpt-4o</code> &nbsp;
-                <code style="font-size:0.78rem;background:#f1f5f9;padding:0.1rem 0.35rem;border-radius:4px;">gemini/gemini-pro</code>
-            </p>
+            <p>Select a model for resume optimization, or choose Custom to enter any LiteLLM-compatible string.</p>
             <div class="criteria-field" style="margin-top:0.85rem;">
                 <label>Model</label>
-                <input type="text" id="model-input" class="criteria-input" placeholder="anthropic/claude-haiku-4-5">
+                <select id="model-select" class="criteria-input" onchange="onModelSelectChange()">
+                    <optgroup label="Anthropic">
+                        <option value="anthropic/claude-haiku-4-5">Claude Haiku 4.5 ·fast &amp; cheap</option>
+                        <option value="anthropic/claude-sonnet-4-6">Claude Sonnet 4.6 ·balanced</option>
+                        <option value="anthropic/claude-opus-4-8">Claude Opus 4.8 ·most capable</option>
+                    </optgroup>
+                    <optgroup label="OpenAI">
+                        <option value="openai/gpt-4o-mini">GPT-4o Mini ·fast &amp; cheap</option>
+                        <option value="openai/gpt-4o">GPT-4o ·balanced</option>
+                        <option value="openai/o3-mini">o3 Mini ·reasoning</option>
+                    </optgroup>
+                    <optgroup label="Google">
+                        <option value="gemini/gemini-2.0-flash">Gemini 2.0 Flash ·fast</option>
+                        <option value="gemini/gemini-2.5-pro">Gemini 2.5 Pro ·capable</option>
+                    </optgroup>
+                    <optgroup label="Other">
+                        <option value="custom">Custom model string…</option>
+                    </optgroup>
+                </select>
+            </div>
+            <div class="criteria-field" id="model-custom-field" style="margin-top:0.4rem;display:none;">
+                <input type="text" id="model-custom-input" class="criteria-input" placeholder="e.g. ollama/llama3, cohere/command-r">
             </div>
             <div class="criteria-field" style="margin-top:0.6rem;">
                 <label>API Key</label>
-                <input type="password" id="model-apikey" class="criteria-input" placeholder="sk-...">
+                <input type="password" id="model-apikey" class="criteria-input" placeholder="sk-ant-…">
             </div>
             <button class="upload-submit" style="margin-top:1rem;" onclick="saveModelConfig()">Save</button>
             <div id="model-save-status" style="font-size:0.82rem;margin-top:0.5rem;min-height:1em;"></div>
@@ -516,9 +533,29 @@
         refreshResumeStatus();
 
         // Model modal
+        function updateApiKeyPlaceholder(model) {
+            const placeholders = { anthropic: 'sk-ant-…', openai: 'sk-…', gemini: 'AIza…' };
+            const provider = (model || '').split('/')[0];
+            document.getElementById('model-apikey').placeholder = placeholders[provider] || 'your API key';
+        }
+        function onModelSelectChange() {
+            const val = document.getElementById('model-select').value;
+            document.getElementById('model-custom-field').style.display = val === 'custom' ? 'block' : 'none';
+            updateApiKeyPlaceholder(val === 'custom' ? '' : val);
+        }
         async function openModelModal() {
             const cfg = await fetch('/model-config').then(r => r.json());
-            document.getElementById('model-input').value = cfg.model || '';
+            const select = document.getElementById('model-select');
+            const knownModels = [...select.options].map(o => o.value).filter(v => v !== 'custom');
+            if (knownModels.includes(cfg.model)) {
+                select.value = cfg.model;
+                document.getElementById('model-custom-field').style.display = 'none';
+            } else {
+                select.value = 'custom';
+                document.getElementById('model-custom-input').value = cfg.model || '';
+                document.getElementById('model-custom-field').style.display = 'block';
+            }
+            updateApiKeyPlaceholder(cfg.model);
             document.getElementById('model-apikey').value = cfg.api_key || '';
             document.getElementById('model-save-status').textContent = '';
             document.getElementById('model-modal').classList.add('open');
@@ -529,7 +566,10 @@
                 document.getElementById('model-modal').classList.remove('open');
         }
         async function saveModelConfig() {
-            const model = document.getElementById('model-input').value.trim();
+            const selectVal = document.getElementById('model-select').value;
+            const model = selectVal === 'custom'
+                ? document.getElementById('model-custom-input').value.trim()
+                : selectVal;
             const api_key = document.getElementById('model-apikey').value.trim();
             const res = await fetch('/model-config', {
                 method: 'POST',
@@ -612,7 +652,7 @@
                 } else if (data.type === 'detail') {
                     line.textContent = `[${data.source}] Fetching ${data.index}/${data.total}: ${data.title} @ ${data.company}`;
                 } else if (data.type === 'source_done') {
-                    line.textContent = `[${data.source}] Done — ${data.count} jobs collected`;
+                    line.textContent = `[${data.source}] Done ·${data.count} jobs collected`;
                     line.className += ' log-success';
                 } else if (data.type === 'done') {
                     line.textContent = `Saved ${data.saved} new jobs (${data.skipped} duplicates skipped)`;
