@@ -1,33 +1,33 @@
-import anthropic
+import litellm
 import json
-from pathlib import Path
-from applo.config import settings
+from applo.config import settings, load_model_config
 from applo.resume.parser import load_or_parse_resume
 from applo.utils.logger import logger
+
+litellm.suppress_debug_info = True
 
 
 class ResumeOptimizer:
     def __init__(self):
-        self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         self.resume_data = load_or_parse_resume(settings.master_resume_path)
 
     def optimize(self, job_title: str, company: str, jd_text: str) -> dict:
-        """
-        Targeted rewrite of summary, skills, top 3 experience bullets.
-        Returns dict with optimized sections + cover letter.
-        """
         logger.info(f"Optimizer | optimizing for: {job_title} @ {company}")
 
+        cfg = load_model_config()
+        if cfg.get("api_key"):
+            litellm.api_key = cfg["api_key"]
+
         prompt = self._build_prompt(job_title, company, jd_text)
-        response = self.client.messages.create(
-            model=settings.anthropic_model,
+        response = litellm.completion(
+            model=cfg["model"],
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )
 
-        raw = response.content[0].text
+        raw = response.choices[0].message.content
         result = self._parse_response(raw)
-        logger.info(f"Optimizer | done. Tokens used — input: {response.usage.input_tokens}, output: {response.usage.output_tokens}")
+        logger.info(f"Optimizer | done. Tokens used — input: {response.usage.prompt_tokens}, output: {response.usage.completion_tokens}")
         return result
 
     def _build_prompt(self, job_title: str, company: str, jd_text: str) -> str:
@@ -80,7 +80,6 @@ Respond ONLY with valid JSON in this exact format, no preamble or markdown:
 
     def _parse_response(self, raw: str) -> dict:
         try:
-            # strip markdown fences if present
             clean = raw.strip()
             if clean.startswith("```"):
                 clean = clean.split("```")[1]

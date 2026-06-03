@@ -11,7 +11,7 @@ from applo.pipeline.filter import JobFilter
 from applo.resume.generator import ResumeGenerator
 from applo.resume.parser import load_or_parse_resume
 from applo.scrapers import ScraperRegistry
-from applo.config import SEARCH_CONFIG_PATH
+from applo.config import SEARCH_CONFIG_PATH, MODEL_CONFIG_PATH, load_model_config
 from sqlalchemy.orm import joinedload
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -105,6 +105,27 @@ async def save_search_config(request: Request):
     data = {k: v for k, v in criteria.model_dump().items() if k != "sources"}
     SEARCH_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     SEARCH_CONFIG_PATH.write_text(json.dumps(data, indent=2))
+    return JSONResponse({"ok": True})
+
+
+@app.get("/model-config")
+async def get_model_config():
+    cfg = load_model_config()
+    masked_key = ("•••" + cfg["api_key"][-6:]) if cfg.get("api_key") else ""
+    return JSONResponse({**cfg, "api_key": masked_key})
+
+
+@app.post("/model-config")
+async def save_model_config(request: Request):
+    body = await request.json()
+    model = body.get("model", "").strip()
+    api_key = body.get("api_key", "").strip()
+    if not model:
+        return JSONResponse({"ok": False, "error": "model is required"}, status_code=400)
+    if api_key.startswith("•"):
+        api_key = load_model_config().get("api_key", "")
+    MODEL_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    MODEL_CONFIG_PATH.write_text(json.dumps({"model": model, "api_key": api_key}, indent=2))
     return JSONResponse({"ok": True})
 
 
