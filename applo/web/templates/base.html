@@ -291,6 +291,33 @@
 </head>
 <body>
 
+    <!-- Model modal -->
+    <div class="modal-overlay" id="model-modal" onclick="closeModelModal(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>LLM Model</h2>
+                <button class="modal-close" onclick="document.getElementById('model-modal').classList.remove('open')">
+                    <i data-lucide="x" style="width:16px;height:16px;"></i>
+                </button>
+            </div>
+            <p>Model used for resume optimization. Use LiteLLM format:<br>
+                <code style="font-size:0.78rem;background:#f1f5f9;padding:0.1rem 0.35rem;border-radius:4px;">anthropic/claude-haiku-4-5</code> &nbsp;
+                <code style="font-size:0.78rem;background:#f1f5f9;padding:0.1rem 0.35rem;border-radius:4px;">openai/gpt-4o</code> &nbsp;
+                <code style="font-size:0.78rem;background:#f1f5f9;padding:0.1rem 0.35rem;border-radius:4px;">gemini/gemini-pro</code>
+            </p>
+            <div class="criteria-field" style="margin-top:0.85rem;">
+                <label>Model</label>
+                <input type="text" id="model-input" class="criteria-input" placeholder="anthropic/claude-haiku-4-5">
+            </div>
+            <div class="criteria-field" style="margin-top:0.6rem;">
+                <label>API Key</label>
+                <input type="password" id="model-apikey" class="criteria-input" placeholder="sk-...">
+            </div>
+            <button class="upload-submit" style="margin-top:1rem;" onclick="saveModelConfig()">Save</button>
+            <div id="model-save-status" style="font-size:0.82rem;margin-top:0.5rem;min-height:1em;"></div>
+        </div>
+    </div>
+
     <!-- Scraper modal -->
     <div class="modal-overlay" id="scraper-modal" onclick="closeScraperModal(event)">
         <div class="modal">
@@ -406,6 +433,10 @@
                     </button>
                 </div>
             </div>
+            <button class="resume-btn" onclick="openModelModal()">
+                <i data-lucide="cpu" style="width:13px;height:13px;"></i>
+                <span id="model-label">Model</span>
+            </button>
             <button class="scraper-btn" onclick="openScraperModal()">
                 <i data-lucide="play" style="width:13px;height:13px;"></i>
                 Run Scraper
@@ -483,6 +514,43 @@
             });
         }
         refreshResumeStatus();
+
+        // Model modal
+        async function openModelModal() {
+            const cfg = await fetch('/model-config').then(r => r.json());
+            document.getElementById('model-input').value = cfg.model || '';
+            document.getElementById('model-apikey').value = cfg.api_key || '';
+            document.getElementById('model-save-status').textContent = '';
+            document.getElementById('model-modal').classList.add('open');
+            lucide.createIcons();
+        }
+        function closeModelModal(e) {
+            if (e.target === document.getElementById('model-modal'))
+                document.getElementById('model-modal').classList.remove('open');
+        }
+        async function saveModelConfig() {
+            const model = document.getElementById('model-input').value.trim();
+            const api_key = document.getElementById('model-apikey').value.trim();
+            const res = await fetch('/model-config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ model, api_key })
+            });
+            const data = await res.json();
+            const status = document.getElementById('model-save-status');
+            if (data.ok) {
+                status.style.color = 'var(--success)';
+                status.textContent = 'Saved.';
+                document.getElementById('model-label').textContent = model.split('/').pop();
+                setTimeout(() => document.getElementById('model-modal').classList.remove('open'), 800);
+            } else {
+                status.style.color = 'var(--danger)';
+                status.textContent = data.error || 'Failed to save.';
+            }
+        }
+        fetch('/model-config').then(r => r.json()).then(cfg => {
+            if (cfg.model) document.getElementById('model-label').textContent = cfg.model.split('/').pop();
+        });
 
         // Scraper modal
         async function openScraperModal() {
