@@ -29,13 +29,17 @@
 
         /* Header */
         header {
-            background: var(--navy); height: 56px;
+            background: var(--navy-light); height: 56px;
             display: flex; align-items: center; justify-content: space-between;
-            padding: 0 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.06);
+            padding: 0 1.5rem; border-bottom: 1px solid rgba(226,232,240,0.08);
             position: sticky; top: 0; z-index: 40;
         }
         .logo { display: flex; align-items: center; gap: 0.5rem; color: white; text-decoration: none; font-weight: 600; font-size: 1rem; letter-spacing: -0.01em; }
-        .logo svg { color: #6366f1; }
+        .logo .logo-icon {
+            display: flex; align-items: center; justify-content: center;
+            width: 28px; height: 28px; border-radius: 7px;
+            background: rgba(99,102,241,0.2); color: #818cf8;
+        }
         .header-right { display: flex; align-items: center; gap: 0.75rem; }
 
         /* Resume dropdown */
@@ -237,9 +241,157 @@
         }
         .upload-submit:hover { background: var(--accent-hover); }
         .upload-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* Scraper modal */
+        .scraper-sources { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.25rem; }
+        .scraper-source-label {
+            display: flex; align-items: center; gap: 0.6rem;
+            font-size: 0.85rem; color: var(--text); cursor: pointer;
+            padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--border);
+            transition: background 0.1s;
+        }
+        .scraper-source-label:hover { background: var(--bg); }
+        .scraper-source-label input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+        .scraper-result { font-size: 0.82rem; margin-top: 0.75rem; min-height: 1.2em; color: var(--muted); }
+        .htmx-indicator { display: none; }
+        .htmx-request .htmx-indicator { display: flex; }
+        .scraper-spinner { align-items: center; gap: 0.4rem; color: #2563eb; font-size: 0.82rem; }
+
+        /* Criteria fields */
+        .criteria-fields { display: flex; flex-direction: column; gap: 0.55rem; margin-bottom: 0.85rem; }
+        .criteria-field { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
+        .criteria-field label { font-size: 0.75rem; font-weight: 600; color: var(--text); }
+        .criteria-hint { font-weight: 400; color: var(--muted); }
+        .criteria-input {
+            padding: 0.38rem 0.6rem; border: 1px solid var(--border); border-radius: 6px;
+            font-size: 0.82rem; color: var(--text); background: var(--surface); width: 100%;
+            font-family: inherit;
+        }
+        .criteria-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(99,102,241,0.1); }
+        .criteria-row { display: flex; gap: 0.6rem; }
+        .criteria-divider {
+            font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.06em; color: var(--muted); margin: 0.6rem 0 0.4rem;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        .criteria-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+        /* Scraper log */
+        .scraper-log {
+            max-height: 180px; overflow-y: auto; font-size: 0.75rem;
+            font-family: monospace; background: #f8fafc; border: 1px solid var(--border);
+            border-radius: 6px; padding: 0.6rem 0.75rem; margin-top: 0.75rem;
+            display: none;
+        }
+        .scraper-log:not(:empty) { display: block; }
+        .log-line { padding: 0.1rem 0; color: var(--text-muted); line-height: 1.5; }
+        .log-success { color: var(--success); font-weight: 500; }
+        .log-error { color: var(--danger); }
     </style>
 </head>
 <body>
+
+    <!-- Model modal -->
+    <div class="modal-overlay" id="model-modal" onclick="closeModelModal(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>LLM Model</h2>
+                <button class="modal-close" onclick="document.getElementById('model-modal').classList.remove('open')">
+                    <i data-lucide="x" style="width:16px;height:16px;"></i>
+                </button>
+            </div>
+            <p>Select a model for resume optimization, or choose Custom to enter any LiteLLM-compatible string.</p>
+            <div class="criteria-field" style="margin-top:0.85rem;">
+                <label>Model</label>
+                <select id="model-select" class="criteria-input" onchange="onModelSelectChange()">
+                    <optgroup label="Anthropic">
+                        <option value="anthropic/claude-haiku-4-5">Claude Haiku 4.5 ·fast &amp; cheap</option>
+                        <option value="anthropic/claude-sonnet-4-6">Claude Sonnet 4.6 ·balanced</option>
+                        <option value="anthropic/claude-opus-4-8">Claude Opus 4.8 ·most capable</option>
+                    </optgroup>
+                    <optgroup label="OpenAI">
+                        <option value="openai/gpt-4o-mini">GPT-4o Mini ·fast &amp; cheap</option>
+                        <option value="openai/gpt-4o">GPT-4o ·balanced</option>
+                        <option value="openai/o3-mini">o3 Mini ·reasoning</option>
+                    </optgroup>
+                    <optgroup label="Google">
+                        <option value="gemini/gemini-2.0-flash">Gemini 2.0 Flash ·fast</option>
+                        <option value="gemini/gemini-2.5-pro">Gemini 2.5 Pro ·capable</option>
+                    </optgroup>
+                    <optgroup label="Other">
+                        <option value="custom">Custom model string…</option>
+                    </optgroup>
+                </select>
+            </div>
+            <div class="criteria-field" id="model-custom-field" style="margin-top:0.4rem;display:none;">
+                <input type="text" id="model-custom-input" class="criteria-input" placeholder="e.g. ollama/llama3, cohere/command-r">
+            </div>
+            <div class="criteria-field" style="margin-top:0.6rem;">
+                <label>API Key</label>
+                <input type="password" id="model-apikey" class="criteria-input" placeholder="sk-ant-…">
+            </div>
+            <button class="upload-submit" style="margin-top:1rem;" onclick="saveModelConfig()">Save</button>
+            <div id="model-save-status" style="font-size:0.82rem;margin-top:0.5rem;min-height:1em;"></div>
+        </div>
+    </div>
+
+    <!-- Scraper modal -->
+    <div class="modal-overlay" id="scraper-modal" onclick="closeScraperModal(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Run Scraper</h2>
+                <button class="modal-close" onclick="document.getElementById('scraper-modal').classList.remove('open')">
+                    <i data-lucide="x" style="width:16px;height:16px;"></i>
+                </button>
+            </div>
+            <p>Select the sources to scrape. Search criteria are loaded from your config.</p>
+
+            <form id="scraper-form" onsubmit="submitScraper(event)">
+
+                <div class="criteria-fields">
+                    <div class="criteria-field">
+                        <label>Job Titles <span class="criteria-hint">comma-separated</span></label>
+                        <input type="text" id="crit-titles" class="criteria-input" placeholder="software engineer, backend engineer">
+                    </div>
+                    <div class="criteria-field">
+                        <label>Locations <span class="criteria-hint">comma-separated</span></label>
+                        <input type="text" id="crit-locations" class="criteria-input" placeholder="remote, New York NY">
+                    </div>
+                    <div class="criteria-field">
+                        <label>Excluded Keywords <span class="criteria-hint">comma-separated</span></label>
+                        <input type="text" id="crit-excluded" class="criteria-input" placeholder="senior, staff, principal">
+                    </div>
+                    <div class="criteria-row">
+                        <div class="criteria-field">
+                            <label>Min Salary</label>
+                            <input type="number" id="crit-salary" class="criteria-input" placeholder="e.g. 80000" step="5000" min="0">
+                        </div>
+                        <div class="criteria-field">
+                            <label>Max Age</label>
+                            <select id="crit-age" class="criteria-input">
+                                <option value="1">1 day</option>
+                                <option value="3">3 days</option>
+                                <option value="7">7 days</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="criteria-divider">Sources</div>
+
+                <div class="scraper-sources" id="scraper-sources">
+                    <!-- populated by JS from window.scraperSources -->
+                </div>
+
+                <button type="submit" class="upload-submit" id="scraper-run-btn" style="margin-top:0.85rem;">
+                    <i data-lucide="play" style="width:13px;height:13px;"></i>
+                    Run Scraper
+                </button>
+            </form>
+
+            <div class="scraper-log" id="scraper-log"></div>
+        </div>
+    </div>
 
     <!-- Upload modal -->
     <div class="modal-overlay" id="upload-modal" onclick="closeUploadModal(event)">
@@ -276,7 +428,7 @@
 
     <header>
         <a href="/" class="logo">
-            <i data-lucide="zap" style="width:18px;height:18px;"></i>
+            <span class="logo-icon"><i data-lucide="zap" style="width:15px;height:15px;"></i></span>
             Applo
         </a>
         <div class="header-right">
@@ -298,7 +450,11 @@
                     </button>
                 </div>
             </div>
-            <button class="scraper-btn" onclick="alert('Run scraper from terminal: python run.py')">
+            <button class="resume-btn" onclick="openModelModal()">
+                <i data-lucide="cpu" style="width:13px;height:13px;"></i>
+                <span id="model-label">Model</span>
+            </button>
+            <button class="scraper-btn" onclick="openScraperModal()">
                 <i data-lucide="play" style="width:13px;height:13px;"></i>
                 Run Scraper
             </button>
@@ -310,6 +466,7 @@
     </div>
 
     <script>
+        window.scraperSources = {{ scrapers | tojson }};
         lucide.createIcons();
 
         // Dropdown
@@ -375,7 +532,155 @@
         }
         refreshResumeStatus();
 
-function showOptimizing(btn) {
+        // Model modal
+        function updateApiKeyPlaceholder(model) {
+            const placeholders = { anthropic: 'sk-ant-…', openai: 'sk-…', gemini: 'AIza…' };
+            const provider = (model || '').split('/')[0];
+            document.getElementById('model-apikey').placeholder = placeholders[provider] || 'your API key';
+        }
+        function onModelSelectChange() {
+            const val = document.getElementById('model-select').value;
+            document.getElementById('model-custom-field').style.display = val === 'custom' ? 'block' : 'none';
+            updateApiKeyPlaceholder(val === 'custom' ? '' : val);
+        }
+        async function openModelModal() {
+            const cfg = await fetch('/model-config').then(r => r.json());
+            const select = document.getElementById('model-select');
+            const knownModels = [...select.options].map(o => o.value).filter(v => v !== 'custom');
+            if (knownModels.includes(cfg.model)) {
+                select.value = cfg.model;
+                document.getElementById('model-custom-field').style.display = 'none';
+            } else {
+                select.value = 'custom';
+                document.getElementById('model-custom-input').value = cfg.model || '';
+                document.getElementById('model-custom-field').style.display = 'block';
+            }
+            updateApiKeyPlaceholder(cfg.model);
+            document.getElementById('model-apikey').value = cfg.api_key || '';
+            document.getElementById('model-save-status').textContent = '';
+            document.getElementById('model-modal').classList.add('open');
+            lucide.createIcons();
+        }
+        function closeModelModal(e) {
+            if (e.target === document.getElementById('model-modal'))
+                document.getElementById('model-modal').classList.remove('open');
+        }
+        async function saveModelConfig() {
+            const selectVal = document.getElementById('model-select').value;
+            const model = selectVal === 'custom'
+                ? document.getElementById('model-custom-input').value.trim()
+                : selectVal;
+            const api_key = document.getElementById('model-apikey').value.trim();
+            const res = await fetch('/model-config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ model, api_key })
+            });
+            const data = await res.json();
+            const status = document.getElementById('model-save-status');
+            if (data.ok) {
+                status.style.color = 'var(--success)';
+                status.textContent = 'Saved.';
+                document.getElementById('model-label').textContent = model.split('/').pop();
+                setTimeout(() => document.getElementById('model-modal').classList.remove('open'), 800);
+            } else {
+                status.style.color = 'var(--danger)';
+                status.textContent = data.error || 'Failed to save.';
+            }
+        }
+        fetch('/model-config').then(r => r.json()).then(cfg => {
+            if (cfg.model) document.getElementById('model-label').textContent = cfg.model.split('/').pop();
+        });
+
+        // Scraper modal
+        async function openScraperModal() {
+            const container = document.getElementById('scraper-sources');
+            container.innerHTML = '';
+            (window.scraperSources || []).forEach(name => {
+                const label = document.createElement('label');
+                label.className = 'scraper-source-label';
+                label.innerHTML = `<input type="checkbox" name="sources" value="${name}" checked> ${name.charAt(0).toUpperCase() + name.slice(1)}`;
+                container.appendChild(label);
+            });
+            document.getElementById('scraper-log').innerHTML = '';
+            document.getElementById('scraper-run-btn').disabled = false;
+
+            const cfg = await fetch('/search-config').then(r => r.json());
+            document.getElementById('crit-titles').value = (cfg.job_titles || []).join(', ');
+            document.getElementById('crit-locations').value = (cfg.locations || []).join(', ');
+            document.getElementById('crit-excluded').value = (cfg.excluded_keywords || []).join(', ');
+            document.getElementById('crit-salary').value = cfg.min_salary || '';
+            document.getElementById('crit-age').value = cfg.max_age_days || 1;
+
+            document.getElementById('scraper-modal').classList.add('open');
+            lucide.createIcons();
+        }
+        function closeScraperModal(e) {
+            if (e.target === document.getElementById('scraper-modal'))
+                document.getElementById('scraper-modal').classList.remove('open');
+        }
+        async function submitScraper(e) {
+            e.preventDefault();
+            const sources = [...document.querySelectorAll('#scraper-sources input:checked')].map(el => el.value);
+            if (!sources.length) return;
+
+            const cfg = {
+                job_titles: document.getElementById('crit-titles').value.split(',').map(s => s.trim()).filter(Boolean),
+                locations: document.getElementById('crit-locations').value.split(',').map(s => s.trim()).filter(Boolean),
+                excluded_keywords: document.getElementById('crit-excluded').value.split(',').map(s => s.trim()).filter(Boolean),
+                min_salary: parseInt(document.getElementById('crit-salary').value) || null,
+                max_age_days: parseInt(document.getElementById('crit-age').value),
+            };
+            await fetch('/search-config', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(cfg) });
+
+            const log = document.getElementById('scraper-log');
+            log.innerHTML = '';
+            document.getElementById('scraper-run-btn').disabled = true;
+
+            const url = '/scrape-stream?' + sources.map(s => `sources=${encodeURIComponent(s)}`).join('&');
+            const es = new EventSource(url);
+
+            es.onmessage = (ev) => {
+                const data = JSON.parse(ev.data);
+                const line = document.createElement('div');
+                line.className = 'log-line';
+
+                if (data.type === 'start') {
+                    line.textContent = `[${data.source}] Scraping "${data.title}" in ${data.location}…`;
+                } else if (data.type === 'found') {
+                    line.textContent = `[${data.source}] Found ${data.count} job cards`;
+                } else if (data.type === 'detail') {
+                    line.textContent = `[${data.source}] Fetching ${data.index}/${data.total}: ${data.title} @ ${data.company}`;
+                } else if (data.type === 'source_done') {
+                    line.textContent = `[${data.source}] Done ·${data.count} jobs collected`;
+                    line.className += ' log-success';
+                } else if (data.type === 'done') {
+                    line.textContent = `Saved ${data.saved} new jobs (${data.skipped} duplicates skipped)`;
+                    line.className += ' log-success';
+                    es.close();
+                    document.getElementById('scraper-run-btn').disabled = false;
+                    htmx.ajax('GET', '/', {target: '#job-list', swap: 'innerHTML', select: '#job-list'});
+                    setTimeout(() => document.getElementById('scraper-modal').classList.remove('open'), 1800);
+                } else if (data.type === 'error') {
+                    line.textContent = `✗ ${data.message}`;
+                    line.className += ' log-error';
+                }
+
+                log.appendChild(line);
+                log.scrollTop = log.scrollHeight;
+            };
+
+            es.onerror = () => {
+                es.close();
+                document.getElementById('scraper-run-btn').disabled = false;
+                const line = document.createElement('div');
+                line.className = 'log-line log-error';
+                line.textContent = 'Connection lost.';
+                log.appendChild(line);
+            };
+        }
+
+        function showOptimizing(btn) {
             const cell = btn.closest('td') || btn.closest('#actions-card');
             if (!cell) return;
             const isCard = cell.id === 'actions-card';

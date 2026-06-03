@@ -1,12 +1,14 @@
 from playwright.async_api import Page
-from applo.models import JobListing, JobSource, SearchCriteria
+from applo.models import JobListing, SearchCriteria
 from applo.utils.logger import logger
 from applo.scrapers.base import BaseScraper
+from applo.scrapers.registry import ScraperRegistry
 from datetime import datetime, timezone
 import hashlib
 import asyncio
 
 
+@ScraperRegistry.register("indeed")
 class IndeedScraper(BaseScraper):
     BASE_URL = "https://www.indeed.com/jobs"
 
@@ -15,11 +17,13 @@ class IndeedScraper(BaseScraper):
         for title in criteria.job_titles:
             for location in criteria.locations:
                 logger.info(f"Indeed | scraping: '{title}' in '{location}'")
+                await self.emit({"type": "start", "source": "indeed", "title": title, "location": location})
                 page = await self.new_page()
                 try:
                     results = await self._scrape_page(page, title, location, criteria.max_age_days)
                     listings.extend(results)
                     logger.info(f"Indeed | found {len(results)} listings")
+                    await self.emit({"type": "source_done", "source": "indeed", "count": len(results)})
                 except Exception as e:
                     logger.error(f"Indeed | failed for '{title}' in '{location}': {e}")
                 finally:
@@ -33,6 +37,7 @@ class IndeedScraper(BaseScraper):
         await page.wait_for_timeout(2000)
 
         cards = await page.query_selector_all('[class*="job_seen_beacon"]')
+        await self.emit({"type": "found", "source": "indeed", "count": len(cards)})
 
         # PASS 1: extract metadata from all cards
         card_data = []
@@ -70,8 +75,10 @@ class IndeedScraper(BaseScraper):
         # PASS 2: click each card and extract JD from right panel
         listings = []
         cards = await page.query_selector_all('[class*="job_seen_beacon"]')
+        total = len(card_data)
 
-        for data in card_data:
+        for i, data in enumerate(card_data, 1):
+            await self.emit({"type": "detail", "source": "indeed", "index": i, "total": total, "title": data["job_title"], "company": data["company"]})
             description = ""
             try:
                 for card in cards:
@@ -100,7 +107,7 @@ class IndeedScraper(BaseScraper):
             salary_min, salary_max = self._parse_salary(data["salary_text"])
 
             listings.append(JobListing(
-                source=JobSource.INDEED,
+                source="indeed",
                 external_id=data["external_id"],
                 title=data["job_title"].strip(),
                 company=data["company"].strip(),

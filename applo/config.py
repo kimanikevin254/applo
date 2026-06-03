@@ -1,11 +1,12 @@
 from pydantic_settings import BaseSettings
 from pydantic import Field
 from pathlib import Path
+import json
 
 class Settings(BaseSettings):
     # Anthropic
     anthropic_api_key: str
-    anthropic_model: str = "claude-haiku-4-5"
+    anthropic_model: str = "anthropic/claude-haiku-4-5"
 
     # App
     app_env: str = "development"
@@ -32,3 +33,15 @@ class Settings(BaseSettings):
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 settings = Settings()
+
+SEARCH_CONFIG_PATH = Path("data/search-config.json")
+MODEL_CONFIG_PATH = Path("data/model-config.json")
+
+
+def load_model_config() -> dict:
+    if MODEL_CONFIG_PATH.exists():
+        return json.loads(MODEL_CONFIG_PATH.read_text())
+    return {
+        "model": settings.anthropic_model,
+        "api_key": settings.anthropic_api_key,
+    }

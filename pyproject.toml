@@ -28,6 +28,7 @@ dependencies = [
     "tenacity>=8.3",
     "playwright-stealth>=2.0.3",
     "python-docx>=1.2.0",
+    "litellm>=1.87.0",
 ]
 
 [project.optional-dependencies]
