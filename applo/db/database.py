@@ -47,6 +47,7 @@ class ApplicationORM(Base):
     tailored_resume_path = Column(String, nullable=True)
     cover_letter = Column(Text, nullable=True)
     optimization_notes = Column(Text, nullable=True)
+    optimization_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=func.now())
     applied_at = Column(DateTime, nullable=True)
@@ -97,7 +98,7 @@ def save_listings(session: Session, listings: list[JobListing]) -> tuple[int, in
     session.commit()
     return saved, skipped
 
-def save_optimization(session: Session, job_id: int, tailored_resume_path: str, cover_letter: str, notes: str) -> None:
+def save_optimization(session: Session, job_id: int, tailored_resume_path: str, cover_letter: str, notes: str, optimization_json: str = None) -> None:
     from applo.models import ApplicationStatus
     app_record = session.query(ApplicationORM).filter(ApplicationORM.job_id == job_id).first()
     if not app_record:
@@ -107,4 +108,6 @@ def save_optimization(session: Session, job_id: int, tailored_resume_path: str, 
     app_record.tailored_resume_path = tailored_resume_path
     app_record.cover_letter = cover_letter
     app_record.optimization_notes = notes
+    if optimization_json is not None:
+        app_record.optimization_json = optimization_json
     session.commit()

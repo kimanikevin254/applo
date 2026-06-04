@@ -23,6 +23,7 @@ import json
 BASE_DIR = Path(__file__).parent
 
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+templates.env.filters["fromjson"] = json.loads
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -238,6 +239,7 @@ async def job_detail(request: Request, job_id: int):
             _ = job.application.tailored_resume_path
             _ = job.application.cover_letter
             _ = job.application.optimization_notes
+            _ = job.application.optimization_json
 
     return templates.TemplateResponse(
         request=request, name="job_detail.html",
@@ -358,6 +360,7 @@ async def optimize(request: Request, job_id: int, source: str = Form(default="li
                 tailored_resume_path=resume_path,
                 cover_letter=result.get("cover_letter", ""),
                 notes=result.get("optimization_notes", ""),
+                optimization_json=json.dumps(result),
             )
 
         logger.info(f"Optimize | complete for job {job_id}")
@@ -413,6 +416,88 @@ async def add_manual_job(
         job_id = job.id
 
     return Response(status_code=303, headers={"Location": f"/job/{job_id}"})
+
+
+@app.post("/job/{job_id}/edit-optimization", response_class=HTMLResponse)
+async def edit_optimization(
+    request: Request,
+    job_id: int,
+    summary: str = Form(default=""),
+    skills: str = Form(default=""),
+    bullets: str = Form(default=""),
+    cover_letter: str = Form(default=""),
+):
+    with get_session() as session:
+        app_record = session.query(ApplicationORM).filter(ApplicationORM.job_id == job_id).first()
+        if not app_record or not app_record.optimization_json:
+            return HTMLResponse("No optimization found", status_code=404)
+
+        existing = json.loads(app_record.optimization_json)
+        existing["summary"] = summary.strip()
+        existing["skills"] = skills.strip()
+        existing["experience_bullets"]["bullets"] = [b.strip() for b in bullets.splitlines() if b.strip()]
+        existing["cover_letter"] = cover_letter.strip()
+
+        job = (
+            session.query(JobListingORM)
+            .options(joinedload(JobListingORM.application))
+            .filter(JobListingORM.id == job_id)
+            .first()
+        )
+        job_title = job.title
+        company = job.company
+        old_resume_path = app_record.tailored_resume_path
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    safe_company = company.replace(" ", "_").replace("/", "_")[:30]
+    resume_path = f"data/output/{job_id}_{safe_company}_{timestamp}_resume.pdf"
+    cover_path = f"data/output/{job_id}_{safe_company}_{timestamp}_cover.pdf"
+
+    resume_data = load_or_parse_resume(settings.master_resume_path)
+    generator = ResumeGenerator()
+    loop = asyncio.get_event_loop()
+
+    await loop.run_in_executor(
+        None,
+        lambda: generator.generate(
+            output_path=resume_path,
+            master_docx_path=settings.master_resume_path,
+            resume_data=resume_data,
+            optimized=existing,
+        )
+    )
+    await loop.run_in_executor(
+        None,
+        lambda: generator.generate_cover_letter(
+            output_path=cover_path,
+            cover_letter_text=existing["cover_letter"],
+            candidate_name=resume_data["sections"].get("header", "").split("\n")[0].strip(),
+        )
+    )
+
+    with get_session() as session:
+        save_optimization(
+            session=session,
+            job_id=job_id,
+            tailored_resume_path=resume_path,
+            cover_letter=existing["cover_letter"],
+            notes=existing.get("optimization_notes", ""),
+            optimization_json=json.dumps(existing),
+        )
+        job = (
+            session.query(JobListingORM)
+            .options(joinedload(JobListingORM.application))
+            .filter(JobListingORM.id == job_id)
+            .first()
+        )
+        _ = job.application
+        if job.application:
+            _ = job.application.optimization_json
+
+    return templates.TemplateResponse(
+        request=request, name="partials/optimization_editor.html",
+        context={"job": job, "saved": True}
+    )
 
 
 @app.get("/preview/{job_id}/resume")
