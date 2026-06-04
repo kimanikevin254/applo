@@ -127,6 +127,7 @@
         }
         .badge-indeed    { background: #eff6ff; color: #3b82f6; }
         .badge-glassdoor { background: #f0fdf4; color: #16a34a; }
+        .badge-manual    { background: #faf5ff; color: #7c3aed; }
         .badge-pending       { background: #fef9ec; color: #b45309; }
         .badge-optimizing    { background: #eff6ff; color: #2563eb; }
         .badge-optimized     { background: #f0fdf4; color: #15803d; }
@@ -335,6 +336,45 @@
         </div>
     </div>
 
+    <!-- Add job modal -->
+    <div class="modal-overlay" id="add-job-modal" onclick="closeAddJobModal(event)">
+        <div class="modal" style="width:520px;">
+            <div class="modal-header">
+                <h2>Add Job Manually</h2>
+                <button class="modal-close" onclick="document.getElementById('add-job-modal').classList.remove('open')">
+                    <i data-lucide="x" style="width:16px;height:16px;"></i>
+                </button>
+            </div>
+            <p>Paste a job description to get an optimized resume without scraping.</p>
+            <form id="add-job-form" method="POST" action="/jobs/manual">
+                <div class="criteria-fields" style="margin-top:0.85rem;">
+                    <div class="criteria-row">
+                        <div class="criteria-field">
+                            <label>Job Title <span class="criteria-hint">required</span></label>
+                            <input type="text" name="title" class="criteria-input" placeholder="e.g. Software Engineer" required>
+                        </div>
+                        <div class="criteria-field">
+                            <label>Company <span class="criteria-hint">required</span></label>
+                            <input type="text" name="company" class="criteria-input" placeholder="e.g. Acme Corp" required>
+                        </div>
+                    </div>
+                    <div class="criteria-field">
+                        <label>Location <span class="criteria-hint">optional</span></label>
+                        <input type="text" name="location" class="criteria-input" placeholder="e.g. Remote, New York NY">
+                    </div>
+                    <div class="criteria-field">
+                        <label>Job Description <span class="criteria-hint">paste from job posting</span></label>
+                        <textarea name="description" class="criteria-input" rows="8" placeholder="Paste the full job description here…" style="resize:vertical;line-height:1.5;"></textarea>
+                    </div>
+                </div>
+                <button type="submit" class="upload-submit" style="margin-top:0.85rem;">
+                    <i data-lucide="plus" style="width:13px;height:13px;"></i>
+                    Add Job
+                </button>
+            </form>
+        </div>
+    </div>
+
     <!-- Scraper modal -->
     <div class="modal-overlay" id="scraper-modal" onclick="closeScraperModal(event)">
         <div class="modal">
@@ -453,6 +493,10 @@
             <button class="resume-btn" onclick="openModelModal()">
                 <i data-lucide="cpu" style="width:13px;height:13px;"></i>
                 <span id="model-label">Model</span>
+            </button>
+            <button class="resume-btn" onclick="openAddJobModal()">
+                <i data-lucide="plus" style="width:13px;height:13px;"></i>
+                Add job
             </button>
             <button class="scraper-btn" onclick="openScraperModal()">
                 <i data-lucide="play" style="width:13px;height:13px;"></i>
@@ -591,6 +635,17 @@
         fetch('/model-config').then(r => r.json()).then(cfg => {
             if (cfg.model) document.getElementById('model-label').textContent = cfg.model.split('/').pop();
         });
+
+        // Add job modal
+        function openAddJobModal() {
+            document.getElementById('add-job-form').reset();
+            document.getElementById('add-job-modal').classList.add('open');
+            lucide.createIcons();
+        }
+        function closeAddJobModal(e) {
+            if (e.target === document.getElementById('add-job-modal'))
+                document.getElementById('add-job-modal').classList.remove('open');
+        }
 
         // Scraper modal
         async function openScraperModal() {

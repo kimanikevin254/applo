@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, UploadFile, File, Query
+from fastapi import FastAPI, Request, Form, UploadFile, File, Query, Response
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, StreamingResponse
 from pathlib import Path
@@ -383,6 +383,37 @@ async def optimize(request: Request, job_id: int, source: str = Form(default="li
 
     partial = "partials/job_actions.html" if source == "detail" else "partials/job_row.html"
     return templates.TemplateResponse(request=request, name=partial, context={"job": job})
+
+@app.post("/jobs/manual")
+async def add_manual_job(
+    request: Request,
+    title: str = Form(...),
+    company: str = Form(...),
+    location: str = Form(default=""),
+    description: str = Form(default=""),
+):
+    import hashlib
+    external_id = "manual_" + hashlib.md5(f"{title}{company}{description[:100]}".encode()).hexdigest()[:12]
+
+    with get_session() as session:
+        from applo.db.database import JobListingORM
+        job = JobListingORM(
+            source="manual",
+            external_id=external_id,
+            title=title.strip(),
+            company=company.strip(),
+            location=location.strip(),
+            job_url="",
+            raw_text=description.strip(),
+            description=description.strip(),
+        )
+        session.add(job)
+        session.commit()
+        session.refresh(job)
+        job_id = job.id
+
+    return Response(status_code=303, headers={"Location": f"/job/{job_id}"})
+
 
 @app.get("/preview/{job_id}/resume")
 async def preview_resume(job_id: int):
