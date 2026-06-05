@@ -14,17 +14,27 @@ playwright install chromium
 cp .env.example .env
 # fill in your ANTHROPIC_API_KEY
 mkdir -p data/resumes data/output
+```
+
+Gotenberg is required for PDF export. Start it with Docker:
+
+```bash
+docker run -p 3000:3000 gotenberg/gotenberg:8
+```
+
+Then start the app:
+
+```bash
 python run.py
 ```
 
-LibreOffice is required for PDF export:
+The app runs at [http://localhost:8000](http://localhost:8000).
+
+Alternatively, run everything together with Docker Compose:
 
 ```bash
-sudo apt install libreoffice   # Ubuntu/Debian
-brew install --cask libreoffice  # macOS
+docker compose up --build
 ```
-
-The app runs at [http://localhost:8000](http://localhost:8000).
 
 ---
 

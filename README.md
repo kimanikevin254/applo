@@ -11,7 +11,7 @@ A self-hosted job application pipeline. Applo scrapes job boards, filters result
 - **Scraper plugin system** — add a new job source by dropping a single file into `applo/scrapers/`. No changes to core files required.
 - **Live scraping progress** — the UI streams real-time updates via Server-Sent Events as jobs are collected.
 - **Multi-provider LLM support** — works with Anthropic, OpenAI, Google Gemini, or any LiteLLM-compatible model.
-- **DOCX-based resume pipeline** — parses your master `.docx` resume, surgically patches optimized sections in-place, and exports to PDF via LibreOffice. Your original formatting is fully preserved.
+- **DOCX-based resume pipeline** — parses your master `.docx` resume, surgically patches optimized sections in-place, and exports to PDF via Gotenberg. Your original formatting is fully preserved.
 - **Resume optimization** — tailors your summary, skills, and experience bullets to match each job description.
 - **Cover letter generation** — writes a role-specific cover letter alongside the resume.
 - **Editable output** — edit the optimized resume and cover letter directly in the UI before regenerating PDFs.
@@ -24,30 +24,41 @@ A self-hosted job application pipeline. Applo scrapes job boards, filters result
 
 ## Quickstart
 
-### 1. Clone and install
+### Docker (recommended)
+
+The easiest way to run Applo. No local dependencies needed beyond Docker.
+
+```bash
+git clone https://github.com/kimanikevin254/applo.git
+cd applo
+cp .env.example .env
+# fill in at minimum your LLM API key
+mkdir -p data/resumes data/output
+docker compose up
+```
+
+Open [http://localhost:8000](http://localhost:8000) in your browser.
+
+Applo runs alongside [Gotenberg](https://gotenberg.dev) — a self-hosted document conversion service used for PDF export. Both start automatically via `docker compose`.
+
+### Local development
 
 ```bash
 git clone https://github.com/kimanikevin254/applo.git
 cd applo
 uv sync
 playwright install chromium
-```
-
-### 2. Configure environment
-
-```bash
 cp .env.example .env
-```
-
-Open `.env` and fill in your values. See [Configuration](#configuration) for all options.
-
-### 3. Create the data directory
-
-```bash
 mkdir -p data/resumes data/output
 ```
 
-### 4. Run
+Gotenberg must be running separately for PDF export:
+
+```bash
+docker run -p 3000:3000 gotenberg/gotenberg:8
+```
+
+Then start the app:
 
 ```bash
 python run.py
@@ -55,9 +66,9 @@ python run.py
 
 Open [http://localhost:8000](http://localhost:8000) in your browser.
 
-### 5. Upload your resume
+### Upload your resume
 
-Click **Resume** in the header and upload your master `.docx` file. This is the base document that gets tailored for each application. LibreOffice must be installed for PDF export (`sudo apt install libreoffice` on Ubuntu/Debian).
+Click **Resume** in the header and upload your master `.docx` file. This is the base document that gets tailored for each application.
 
 ---
 
@@ -65,18 +76,19 @@ Click **Resume** in the header and upload your master `.docx` file. This is the 
 
 All config is read from `.env`. Copy `.env.example` to get started.
 
-| Variable                  | Required | Default                      | Description                                                     |
-| ------------------------- | -------- | ---------------------------- | --------------------------------------------------------------- |
-| `ANTHROPIC_API_KEY`       | Yes\*    |                              | Default LLM API key. Can be overridden in the UI.               |
-| `ANTHROPIC_MODEL`         | No       | `anthropic/claude-haiku-4-5` | Default model in LiteLLM format.                                |
-| `DATABASE_URL`            | No       | `sqlite:///./data/applo.db`  | SQLAlchemy connection string.                                   |
-| `SCRAPER_HEADLESS`        | No       | `true`                       | Run browser in headless mode. Set to `false` to watch scraping. |
-| `SCRAPER_DELAY_SECS`      | No       | `2`                          | Delay between page requests.                                    |
-| `MASTER_RESUME_PATH`      | No       | `data/resumes/master.docx`   | Path to your master resume.                                     |
-| `GOOGLE_CREDENTIALS_PATH` | No       | `data/google_credentials.json` | OAuth 2.0 client secret downloaded from Google Cloud Console. Required for Google integration. |
-| `GOOGLE_TOKEN_PATH`       | No       | `data/token.json`            | Where the OAuth token is saved after connecting.                |
-| `GOOGLE_SHEET_ID`         | No       |                              | ID of the Google Sheet to sync your pipeline to.                |
-| `GOOGLE_DRIVE_FOLDER_ID`  | No       |                              | ID of the Drive folder to upload resumes and cover letters to.  |
+| Variable                  | Required | Default                        | Description                                                        |
+| ------------------------- | -------- | ------------------------------ | ------------------------------------------------------------------ |
+| `ANTHROPIC_API_KEY`       | Yes\*    |                                | Default LLM API key. Can be overridden in the UI.                  |
+| `ANTHROPIC_MODEL`         | No       | `anthropic/claude-haiku-4-5`   | Default model in LiteLLM format.                                   |
+| `DATABASE_URL`            | No       | `sqlite:///./data/applo.db`    | SQLAlchemy connection string.                                      |
+| `SCRAPER_HEADLESS`        | No       | `true`                         | Run browser in headless mode. Set to `false` to watch scraping.    |
+| `SCRAPER_DELAY_SECS`      | No       | `2`                            | Delay between page requests.                                       |
+| `MASTER_RESUME_PATH`      | No       | `data/resumes/master.docx`     | Path to your master resume.                                        |
+| `GOTENBERG_URL`           | No       | `http://localhost:3000`        | URL of the Gotenberg service. Set automatically in Docker.         |
+| `GOOGLE_CREDENTIALS_PATH` | No       | `data/google_credentials.json` | OAuth 2.0 client secret from Google Cloud Console.                 |
+| `GOOGLE_TOKEN_PATH`       | No       | `data/token.json`              | Where the OAuth token is saved after connecting.                   |
+| `GOOGLE_SHEET_ID`         | No       |                                | ID of the Google Sheet to sync your pipeline to.                   |
+| `GOOGLE_DRIVE_FOLDER_ID`  | No       |                                | ID of the Drive folder to upload resumes and cover letters to.     |
 
 \*Required only if you have not set a key via the Model modal in the UI.
 
@@ -166,7 +178,7 @@ applo/
     filter.py           # Post-scrape keyword, salary, and description filtering
   resume/
     parser.py           # Extracts sections and paragraph map from master .docx
-    generator.py        # Patches optimized sections in-place, exports PDF via LibreOffice
+    generator.py        # Patches optimized sections in-place, exports PDF via Gotenberg
   integrations/
     google.py           # OAuth flow, SheetsSync, DriveUpload
   db/
@@ -197,7 +209,7 @@ data/
 | LLM                | LiteLLM (Anthropic, OpenAI, Gemini, and more) |
 | Database           | SQLite via SQLAlchemy                         |
 | Resume parsing     | python-docx                                   |
-| PDF export         | LibreOffice (headless)                        |
+| PDF export         | Gotenberg (self-hosted, via Docker)           |
 | Google integration | google-auth-oauthlib + gspread                |
 
 ---
