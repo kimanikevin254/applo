@@ -624,17 +624,17 @@ async def resume_preview():
 
 
 def _convert_docx_to_preview(docx_path: Path, pdf_path: Path):
-    import subprocess
-    result = subprocess.run(
-        ["libreoffice", "--headless", "--convert-to", "pdf",
-         "--outdir", str(pdf_path.parent), str(docx_path)],
-        capture_output=True, text=True, timeout=60,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"LibreOffice conversion failed: {result.stderr}")
-    converted = pdf_path.parent / (docx_path.stem + ".pdf")
-    if converted != pdf_path:
-        converted.rename(pdf_path)
+    import httpx
+    url = f"{settings.gotenberg_url}/forms/libreoffice/convert/files"
+    with open(docx_path, "rb") as f:
+        response = httpx.post(
+            url,
+            files={"files": (docx_path.name, f, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+            timeout=60,
+        )
+    if response.status_code != 200:
+        raise RuntimeError(f"Gotenberg conversion failed: {response.status_code}")
+    pdf_path.write_bytes(response.content)
 
 
 @app.get("/resume/status")

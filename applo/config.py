@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     min_salary: int | None = None
     scraper_max_age_days: int = 1
 
+    # Gotenberg
+    gotenberg_url: str = "http://localhost:3000"
+
     # Google
     google_credentials_path: Path = Path("data/google_credentials.json")
     google_token_path: Path = Path("data/token.json")

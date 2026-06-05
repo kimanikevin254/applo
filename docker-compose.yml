@@ -1,0 +1,29 @@
+services:
+  applo:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      - GOTENBERG_URL=http://gotenberg:3000
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      gotenberg:
+        condition: service_healthy
+    restart: unless-stopped
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    ports:
+      - "3000:3000"
+    command:
+      - gotenberg
+      - --chromium-disable-routes=true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
