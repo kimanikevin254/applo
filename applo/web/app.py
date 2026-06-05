@@ -12,7 +12,8 @@ from applo.resume.generator import ResumeGenerator
 from applo.resume.parser import load_or_parse_resume
 from applo.scrapers import ScraperRegistry
 from applo.config import SEARCH_CONFIG_PATH, MODEL_CONFIG_PATH, load_model_config
-from applo.integrations.google import SheetsSync, DriveUpload
+from applo.integrations.google import SheetsSync, DriveUpload, get_credentials, is_connected, get_auth_url, exchange_code, disconnect
+from googleapiclient.discovery import build
 from sqlalchemy.orm import joinedload
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -258,7 +259,7 @@ def _build_job_row(job) -> dict:
         "location": job.location,
         "salary_min": job.salary_min,
         "salary_max": job.salary_max,
-        "source": job.source.value,
+        "source": job.source.value if hasattr(job.source, "value") else job.source,
         "status": app.status.value if app else "pending",
         "optimization_notes": app.optimization_notes if app else "",
         "job_url": job.job_url,
@@ -705,6 +706,41 @@ async def sync_sheets(request: Request):
     except Exception as e:
         logger.error(f"Sheets | sync failed: {e}")
         return HTMLResponse(f'<span id="sync-status" style="font-size:0.8rem;color:#ef4444;">Sync failed: {e}</span>')
+
+@app.get("/auth/google/status")
+async def google_status():
+    creds = get_credentials()
+    if not creds:
+        return JSONResponse({"connected": False, "email": None})
+    try:
+        service = build("oauth2", "v2", credentials=creds)
+        info = service.userinfo().get().execute()
+        return JSONResponse({"connected": True, "email": info.get("email")})
+    except Exception:
+        return JSONResponse({"connected": True, "email": None})
+
+
+@app.get("/auth/google")
+async def google_auth(request: Request):
+    redirect_uri = str(request.base_url) + "auth/google/callback"
+    url = get_auth_url(redirect_uri)
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url)
+
+
+@app.get("/auth/google/callback")
+async def google_callback(request: Request, code: str):
+    redirect_uri = str(request.base_url) + "auth/google/callback"
+    exchange_code(code, redirect_uri)
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse("/")
+
+
+@app.post("/auth/google/disconnect")
+async def google_disconnect():
+    disconnect()
+    return JSONResponse({"ok": True})
+
 
 if __name__ == "__main__":
     uvicorn.run("applo.web.app:app", host="0.0.0.0", port=8000, reload=True)

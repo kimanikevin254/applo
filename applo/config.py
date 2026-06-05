@@ -31,7 +31,8 @@ class Settings(BaseSettings):
     scraper_max_age_days: int = 1
 
     # Google
-    google_service_account_path: Path = Path("data/google_service_account.json")
+    google_credentials_path: Path = Path("data/google_credentials.json")
+    google_token_path: Path = Path("data/token.json")
     google_sheet_id: str = ""
     google_drive_folder_id: str = ""
 

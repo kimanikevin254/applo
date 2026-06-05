@@ -433,6 +433,31 @@
         </div>
     </div>
 
+    <!-- Google connect modal -->
+    <div class="modal-overlay" id="google-modal" onclick="closeGoogleModal(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Connect Google Account</h2>
+                <button class="modal-close" onclick="skipGoogle()">
+                    <i data-lucide="x" style="width:16px;height:16px;"></i>
+                </button>
+            </div>
+            <p>Applo uses your Google account to:</p>
+            <ul style="font-size:0.82rem;color:var(--muted);margin:0 0 1rem 1.2rem;line-height:2;">
+                <li>Back up tailored resumes &amp; cover letters to <strong>Google Drive</strong></li>
+                <li>Sync your job pipeline to <strong>Google Sheets</strong> for tracking</li>
+            </ul>
+            <p style="margin-bottom:1.25rem;">Without connecting, files are saved locally only and Sheets sync is unavailable.</p>
+            <a href="/auth/google" class="upload-submit" style="display:flex;align-items:center;justify-content:center;gap:0.5rem;text-decoration:none;margin-bottom:0.6rem;">
+                <i data-lucide="link" style="width:14px;height:14px;"></i>
+                Connect Google Account
+            </a>
+            <button onclick="skipGoogle()" style="width:100%;background:none;border:none;font-size:0.82rem;color:var(--muted);cursor:pointer;padding:0.4rem;">
+                Skip for now — I'll save files locally
+            </button>
+        </div>
+    </div>
+
     <!-- Upload modal -->
     <div class="modal-overlay" id="upload-modal" onclick="closeUploadModal(event)">
         <div class="modal">
@@ -490,6 +515,26 @@
                     </button>
                 </div>
             </div>
+            <div class="resume-menu" id="google-menu">
+                <button class="resume-btn" onclick="toggleGoogleDropdown()">
+                    <span class="status-dot" id="google-dot"></span>
+                    <span id="google-label">Google</span>
+                    <i data-lucide="chevron-down" style="width:12px;height:12px;opacity:0.6;"></i>
+                </button>
+                <div class="resume-dropdown" id="google-dropdown">
+                    <div id="google-email-item" class="dropdown-item disabled" style="font-size:0.78rem;cursor:default;"></div>
+                    <div class="dropdown-divider" id="google-divider" style="display:none;"></div>
+                    <a class="dropdown-item" href="/auth/google" id="google-connect-item">
+                        <i data-lucide="link" style="width:14px;height:14px;"></i>
+                        Connect Google Account
+                    </a>
+                    <button class="dropdown-item" id="google-disconnect-item" style="display:none;" onclick="disconnectGoogle()">
+                        <i data-lucide="unlink" style="width:14px;height:14px;"></i>
+                        Disconnect
+                    </button>
+                </div>
+            </div>
+
             <button class="resume-btn" onclick="openModelModal()">
                 <i data-lucide="cpu" style="width:13px;height:13px;"></i>
                 <span id="model-label">Model</span>
@@ -743,6 +788,62 @@
                 log.appendChild(line);
             };
         }
+
+        // Google auth
+        function toggleGoogleDropdown() {
+            document.getElementById('google-dropdown').classList.toggle('open');
+        }
+        document.addEventListener('click', function(e) {
+            const menu = document.getElementById('google-menu');
+            if (menu && !menu.contains(e.target))
+                document.getElementById('google-dropdown').classList.remove('open');
+        });
+
+        function skipGoogle() {
+            document.getElementById('google-modal').classList.remove('open');
+            sessionStorage.setItem('google_skipped', '1');
+        }
+        function closeGoogleModal(e) {
+            if (e.target === document.getElementById('google-modal')) skipGoogle();
+        }
+        async function disconnectGoogle() {
+            await fetch('/auth/google/disconnect', { method: 'POST' });
+            document.getElementById('google-dropdown').classList.remove('open');
+            refreshGoogleStatus();
+        }
+
+        async function refreshGoogleStatus() {
+            const data = await fetch('/auth/google/status').then(r => r.json());
+            const dot = document.getElementById('google-dot');
+            const label = document.getElementById('google-label');
+            const emailItem = document.getElementById('google-email-item');
+            const connectItem = document.getElementById('google-connect-item');
+            const disconnectItem = document.getElementById('google-disconnect-item');
+            const divider = document.getElementById('google-divider');
+
+            if (data.connected) {
+                dot.className = 'status-dot loaded';
+                label.textContent = 'Google connected';
+                emailItem.textContent = data.email || 'Connected';
+                emailItem.style.display = 'flex';
+                divider.style.display = 'block';
+                connectItem.style.display = 'none';
+                disconnectItem.style.display = 'flex';
+            } else {
+                dot.className = 'status-dot missing';
+                label.textContent = 'Google';
+                emailItem.style.display = 'none';
+                divider.style.display = 'none';
+                connectItem.style.display = 'flex';
+                disconnectItem.style.display = 'none';
+
+                // Show modal on first load if not skipped
+                if (!sessionStorage.getItem('google_skipped')) {
+                    document.getElementById('google-modal').classList.add('open');
+                }
+            }
+        }
+        refreshGoogleStatus();
 
         function showOptimizing(btn) {
             const cell = btn.closest('td') || btn.closest('#actions-card');
