@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     min_salary: int | None = None
     scraper_max_age_days: int = 1
 
+    # Google
+    google_service_account_path: Path = Path("data/google_service_account.json")
+    google_sheet_id: str = ""
+    google_drive_folder_id: str = ""
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 settings = Settings()

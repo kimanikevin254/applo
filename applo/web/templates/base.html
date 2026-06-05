@@ -498,6 +498,15 @@
                 <i data-lucide="plus" style="width:13px;height:13px;"></i>
                 Add job
             </button>
+            <button class="scraper-btn"
+                hx-post="/sync/sheets"
+                hx-target="#sync-status"
+                hx-swap="outerHTML"
+                hx-on:htmx:before-request="document.getElementById('sync-status').textContent='Syncing…'">
+                <i data-lucide="table-2" style="width:13px;height:13px;"></i>
+                Sync to Sheets
+            </button>
+            <span id="sync-status" style="font-size:0.8rem;color:rgba(255,255,255,0.6);"></span>
             <button class="scraper-btn" onclick="openScraperModal()">
                 <i data-lucide="play" style="width:13px;height:13px;"></i>
                 Run Scraper

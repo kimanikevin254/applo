@@ -48,9 +48,12 @@ class ApplicationORM(Base):
     cover_letter = Column(Text, nullable=True)
     optimization_notes = Column(Text, nullable=True)
     optimization_json = Column(Text, nullable=True)
+    resume_drive_link = Column(String, nullable=True)
+    cover_letter_drive_link = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=func.now())
     applied_at = Column(DateTime, nullable=True)
+    synced_at = Column(DateTime, nullable=True)
 
     job = relationship("JobListingORM", back_populates="application")
 
@@ -98,7 +101,7 @@ def save_listings(session: Session, listings: list[JobListing]) -> tuple[int, in
     session.commit()
     return saved, skipped
 
-def save_optimization(session: Session, job_id: int, tailored_resume_path: str, cover_letter: str, notes: str, optimization_json: str = None) -> None:
+def save_optimization(session: Session, job_id: int, tailored_resume_path: str, cover_letter: str, notes: str, optimization_json: str = None, resume_drive_link: str = None, cover_letter_drive_link: str = None) -> None:
     from applo.models import ApplicationStatus
     app_record = session.query(ApplicationORM).filter(ApplicationORM.job_id == job_id).first()
     if not app_record:
@@ -110,4 +113,8 @@ def save_optimization(session: Session, job_id: int, tailored_resume_path: str, 
     app_record.optimization_notes = notes
     if optimization_json is not None:
         app_record.optimization_json = optimization_json
+    if resume_drive_link is not None:
+        app_record.resume_drive_link = resume_drive_link
+    if cover_letter_drive_link is not None:
+        app_record.cover_letter_drive_link = cover_letter_drive_link
     session.commit()

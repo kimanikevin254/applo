@@ -12,6 +12,7 @@ from applo.resume.generator import ResumeGenerator
 from applo.resume.parser import load_or_parse_resume
 from applo.scrapers import ScraperRegistry
 from applo.config import SEARCH_CONFIG_PATH, MODEL_CONFIG_PATH, load_model_config
+from applo.integrations.google import SheetsSync, DriveUpload
 from sqlalchemy.orm import joinedload
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -247,6 +248,41 @@ async def job_detail(request: Request, job_id: int):
     )
 
 
+def _build_job_row(job) -> dict:
+    """Build the dict passed to SheetsSync from a loaded JobListingORM."""
+    app = job.application
+    return {
+        "id": job.id,
+        "title": job.title,
+        "company": job.company,
+        "location": job.location,
+        "salary_min": job.salary_min,
+        "salary_max": job.salary_max,
+        "source": job.source.value,
+        "status": app.status.value if app else "pending",
+        "optimization_notes": app.optimization_notes if app else "",
+        "job_url": job.job_url,
+        "scraped_at": job.scraped_at.strftime("%Y-%m-%d") if job.scraped_at else "",
+        "resume_link": app.resume_drive_link if app else "",
+        "cover_letter_link": app.cover_letter_drive_link if app else "",
+    }
+
+
+async def _auto_sync(job_row: dict, job_id: int):
+    """Fire-and-forget Sheets sync for a single job. Stamps synced_at on success."""
+    try:
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, lambda: SheetsSync().sync_one(job_row))
+        with get_session() as session:
+            app_record = session.query(ApplicationORM).filter(ApplicationORM.job_id == job_id).first()
+            if app_record:
+                app_record.synced_at = datetime.now()
+                session.commit()
+        logger.info(f"Sheets | auto-synced job {job_id}")
+    except Exception as e:
+        logger.warning(f"Sheets | auto-sync failed for job {job_id}: {e}")
+
+
 @app.post("/job/{job_id}/status", response_class=HTMLResponse)
 async def update_status(request: Request, job_id: int, status: str = Form(...), source: str = Form(default="list")):
     with get_session() as session:
@@ -266,6 +302,8 @@ async def update_status(request: Request, job_id: int, status: str = Form(...), 
             .filter(JobListingORM.id == job_id)
             .first()
         )
+
+    asyncio.create_task(_auto_sync(_build_job_row(job), job_id))
 
     partial = "partials/job_actions.html" if source == "detail" else "partials/job_row.html"
     return templates.TemplateResponse(request=request, name=partial, context={"job": job})
@@ -352,6 +390,20 @@ async def optimize(request: Request, job_id: int, source: str = Form(default="li
             )
         )
 
+        # upload to Drive
+        resume_drive_link = None
+        cover_letter_drive_link = None
+        try:
+            drive = DriveUpload()
+            resume_drive_link = await loop.run_in_executor(
+                None, lambda: drive.upload(resume_path, f"{safe_company}_resume.pdf")
+            )
+            cover_letter_drive_link = await loop.run_in_executor(
+                None, lambda: drive.upload(cover_path, f"{safe_company}_cover.pdf")
+            )
+        except Exception as drive_err:
+            logger.warning(f"Drive | upload failed, continuing without links: {drive_err}")
+
         # save to DB
         with get_session() as session:
             save_optimization(
@@ -360,10 +412,22 @@ async def optimize(request: Request, job_id: int, source: str = Form(default="li
                 tailored_resume_path=resume_path,
                 cover_letter=result.get("cover_letter", ""),
                 notes=result.get("optimization_notes", ""),
-                optimization_json=json.dumps(result),
+                resume_drive_link=resume_drive_link,
+                cover_letter_drive_link=cover_letter_drive_link,
             )
 
+
         logger.info(f"Optimize | complete for job {job_id}")
+
+        with get_session() as session:
+            _job = (
+                session.query(JobListingORM)
+                .options(joinedload(JobListingORM.application))
+                .filter(JobListingORM.id == job_id)
+                .first()
+            )
+            if _job:
+                asyncio.create_task(_auto_sync(_build_job_row(_job), job_id))
 
     except Exception as e:
         logger.error(f"Optimize | failed for job {job_id}: {e}")
@@ -601,6 +665,46 @@ async def resume_upload(request: Request, file: UploadFile = File(...)):
     logger.info(f"Resume | uploaded new master: {file.filename}")
     return HTMLResponse('<span id="upload-status" style="color:#28a745;">Resume uploaded successfully.</span>')
 
+@app.post("/sync/sheets", response_class=HTMLResponse)
+async def sync_sheets(request: Request):
+    try:
+        with get_session() as session:
+            jobs = (
+                session.query(JobListingORM)
+                .outerjoin(ApplicationORM)
+                .options(joinedload(JobListingORM.application))
+                .all()
+            )
+            # Only push rows that have never been synced or changed since last sync
+            stale = [
+                job for job in jobs
+                if not job.application
+                or job.application.synced_at is None
+                or (job.application.updated_at and job.application.synced_at < job.application.updated_at)
+            ]
+            rows = [_build_job_row(job) for job in stale]
+            stale_ids = [job.id for job in stale]
+
+        if not rows:
+            return HTMLResponse('<span id="sync-status" style="font-size:0.8rem;color:rgba(255,255,255,0.5);">Already up to date</span>')
+
+        loop = asyncio.get_event_loop()
+        synced = await loop.run_in_executor(None, lambda: SheetsSync().sync_stale(rows))
+
+        # Stamp synced_at for all pushed rows
+        with get_session() as session:
+            now = datetime.now()
+            for job_id in stale_ids:
+                app_record = session.query(ApplicationORM).filter(ApplicationORM.job_id == job_id).first()
+                if app_record:
+                    app_record.synced_at = now
+            session.commit()
+
+        return HTMLResponse(f'<span id="sync-status" style="font-size:0.8rem;color:#10b981;">✓ {synced} jobs synced</span>')
+
+    except Exception as e:
+        logger.error(f"Sheets | sync failed: {e}")
+        return HTMLResponse(f'<span id="sync-status" style="font-size:0.8rem;color:#ef4444;">Sync failed: {e}</span>')
 
 if __name__ == "__main__":
     uvicorn.run("applo.web.app:app", host="0.0.0.0", port=8000, reload=True)
