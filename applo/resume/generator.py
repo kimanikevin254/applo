@@ -71,7 +71,7 @@ def _patch_job_bullets(
 
 def _to_pdf(docx_path: Path, pdf_path: Path) -> Path:
     from applo.config import settings
-    url = f"{settings.gotenberg_url}/forms/libreoffice/convert/files"
+    url = f"{settings.gotenberg_url}/forms/libreoffice/convert"
     with open(docx_path, "rb") as f:
         response = httpx.post(
             url,

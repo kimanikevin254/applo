@@ -625,7 +625,7 @@ async def resume_preview():
 
 def _convert_docx_to_preview(docx_path: Path, pdf_path: Path):
     import httpx
-    url = f"{settings.gotenberg_url}/forms/libreoffice/convert/files"
+    url = f"{settings.gotenberg_url}/forms/libreoffice/convert"
     with open(docx_path, "rb") as f:
         response = httpx.post(
             url,
