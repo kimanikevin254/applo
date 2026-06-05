@@ -1,6 +1,6 @@
 # Applo
 
-A self-hosted job application pipeline. Applo scrapes job boards, filters results against your criteria, and uses an LLM to tailor your resume and write a cover letter for each role. Everything runs locally. Your resume and API keys never leave your machine.
+A self-hosted job application pipeline. Applo scrapes job boards, filters results against your criteria, and uses an LLM to tailor your resume and write a cover letter for each role. Optionally syncs your pipeline to Google Sheets and backs up documents to Google Drive.
 
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue) ![FastAPI](https://img.shields.io/badge/FastAPI-0.111%2B-009688) ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -8,15 +8,17 @@ A self-hosted job application pipeline. Applo scrapes job boards, filters result
 
 ## Features
 
-- **Scraper plugin system**: add a new job source by dropping a single file into `applo/scrapers/`. No changes to core files required.
-- **Live scraping progress**: the UI streams real-time updates via Server-Sent Events as jobs are collected.
-- **Multi-provider LLM support**: works with Anthropic, OpenAI, Google Gemini, or any LiteLLM-compatible model.
-- **Resume optimization**: tailors your summary, skills, and experience bullets to match each job description.
-- **Cover letter generation**: writes a role-specific cover letter alongside the resume.
-- **Editable output**: edit the optimized resume and cover letter directly in the UI before regenerating PDFs.
-- **Manual job entry**: paste a job description without scraping to get an optimized resume for any role.
-- **Configurable search criteria**: set job titles, locations, excluded keywords, and salary floor from the UI.
-- **Application pipeline**: track each job through pending, optimized, approved, applied, and rejected stages.
+- **Scraper plugin system** — add a new job source by dropping a single file into `applo/scrapers/`. No changes to core files required.
+- **Live scraping progress** — the UI streams real-time updates via Server-Sent Events as jobs are collected.
+- **Multi-provider LLM support** — works with Anthropic, OpenAI, Google Gemini, or any LiteLLM-compatible model.
+- **DOCX-based resume pipeline** — parses your master `.docx` resume, surgically patches optimized sections in-place, and exports to PDF via LibreOffice. Your original formatting is fully preserved.
+- **Resume optimization** — tailors your summary, skills, and experience bullets to match each job description.
+- **Cover letter generation** — writes a role-specific cover letter alongside the resume.
+- **Editable output** — edit the optimized resume and cover letter directly in the UI before regenerating PDFs.
+- **Manual job entry** — paste a job description without scraping to get an optimized resume for any role.
+- **Configurable search criteria** — set job titles, locations, excluded keywords, and salary floor from the UI.
+- **Application pipeline** — track each job through pending, optimized, approved, applied, and rejected stages.
+- **Google integration (optional)** — connect your Google account to back up PDFs to Drive and auto-sync your pipeline to Sheets for tracking.
 
 ---
 
@@ -27,9 +29,7 @@ A self-hosted job application pipeline. Applo scrapes job boards, filters result
 ```bash
 git clone https://github.com/kimanikevin254/applo.git
 cd applo
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
+uv sync
 playwright install chromium
 ```
 
@@ -39,13 +39,7 @@ playwright install chromium
 cp .env.example .env
 ```
 
-Open `.env` and fill in your values:
-
-```env
-ANTHROPIC_API_KEY=sk-ant-...
-```
-
-See [Configuration](#configuration) for all available options.
+Open `.env` and fill in your values. See [Configuration](#configuration) for all options.
 
 ### 3. Create the data directory
 
@@ -63,7 +57,7 @@ Open [http://localhost:8000](http://localhost:8000) in your browser.
 
 ### 5. Upload your resume
 
-Click **Resume** in the header and upload your master `.docx` file. This is the base document that gets tailored for each application.
+Click **Resume** in the header and upload your master `.docx` file. This is the base document that gets tailored for each application. LibreOffice must be installed for PDF export (`sudo apt install libreoffice` on Ubuntu/Debian).
 
 ---
 
@@ -71,18 +65,37 @@ Click **Resume** in the header and upload your master `.docx` file. This is the 
 
 All config is read from `.env`. Copy `.env.example` to get started.
 
-| Variable             | Required | Default                      | Description                                                     |
-| -------------------- | -------- | ---------------------------- | --------------------------------------------------------------- |
-| `ANTHROPIC_API_KEY`  | Yes\*    |                              | Default LLM API key. Can be overridden in the UI.               |
-| `ANTHROPIC_MODEL`    | No       | `anthropic/claude-haiku-4-5` | Default model in LiteLLM format.                                |
-| `DATABASE_URL`       | No       | `sqlite:///./data/applo.db`  | SQLAlchemy connection string.                                   |
-| `SCRAPER_HEADLESS`   | No       | `true`                       | Run browser in headless mode. Set to `false` to watch scraping. |
-| `SCRAPER_DELAY_SECS` | No       | `2`                          | Delay between page requests.                                    |
-| `MASTER_RESUME_PATH` | No       | `data/resumes/master.docx`   | Path to your master resume.                                     |
+| Variable                  | Required | Default                      | Description                                                     |
+| ------------------------- | -------- | ---------------------------- | --------------------------------------------------------------- |
+| `ANTHROPIC_API_KEY`       | Yes\*    |                              | Default LLM API key. Can be overridden in the UI.               |
+| `ANTHROPIC_MODEL`         | No       | `anthropic/claude-haiku-4-5` | Default model in LiteLLM format.                                |
+| `DATABASE_URL`            | No       | `sqlite:///./data/applo.db`  | SQLAlchemy connection string.                                   |
+| `SCRAPER_HEADLESS`        | No       | `true`                       | Run browser in headless mode. Set to `false` to watch scraping. |
+| `SCRAPER_DELAY_SECS`      | No       | `2`                          | Delay between page requests.                                    |
+| `MASTER_RESUME_PATH`      | No       | `data/resumes/master.docx`   | Path to your master resume.                                     |
+| `GOOGLE_CREDENTIALS_PATH` | No       | `data/google_credentials.json` | OAuth 2.0 client secret downloaded from Google Cloud Console. Required for Google integration. |
+| `GOOGLE_TOKEN_PATH`       | No       | `data/token.json`            | Where the OAuth token is saved after connecting.                |
+| `GOOGLE_SHEET_ID`         | No       |                              | ID of the Google Sheet to sync your pipeline to.                |
+| `GOOGLE_DRIVE_FOLDER_ID`  | No       |                              | ID of the Drive folder to upload resumes and cover letters to.  |
 
 \*Required only if you have not set a key via the Model modal in the UI.
 
-The model and API key can also be changed at runtime through the **Model** button in the header. No restart needed.
+---
+
+## Google Integration (optional)
+
+Applo can sync your job pipeline to Google Sheets and back up generated PDFs to Google Drive. This is entirely optional — without it, files are saved locally and Sheets sync is unavailable.
+
+### Setup
+
+1. Create a Google Cloud project and enable the **Google Sheets API** and **Google Drive API**
+2. Create an **OAuth 2.0 Client ID** (Desktop app) and download the JSON as `data/google_credentials.json`
+3. Configure the OAuth consent screen (External, add yourself as a test user)
+4. Create a Google Sheet and a Drive folder — copy their IDs into `.env`
+5. Start Applo — a modal will prompt you to connect your Google account on first load
+6. Click **Connect Google Account** and complete the OAuth flow in your browser
+
+Once connected, resumes and cover letters are uploaded to Drive automatically on optimization, and job status changes sync to Sheets in the background. The **Sync to Sheets** button in the header force-syncs any stale rows.
 
 ---
 
@@ -144,29 +157,32 @@ See [docs/scrapers.md](docs/scrapers.md) for the full plugin API reference.
 ```
 applo/
   scrapers/
-    registry.py       # ScraperRegistry -- plugin registration
-    base.py           # BaseScraper -- all scrapers extend this
-    indeed.py         # Indeed scraper
-    glassdoor.py      # Glassdoor scraper
+    registry.py         # ScraperRegistry -- plugin registration
+    base.py             # BaseScraper -- all scrapers extend this
+    indeed.py           # Indeed scraper
+    glassdoor.py        # Glassdoor scraper
   pipeline/
-    optimizer.py      # LiteLLM resume + cover letter generation
-    filter.py         # Post-scrape keyword and salary filtering
+    optimizer.py        # LiteLLM resume + cover letter generation
+    filter.py           # Post-scrape keyword, salary, and description filtering
   resume/
-    parser.py         # Extracts sections from master .docx
-    generator.py      # Renders tailored resume and cover letter PDFs
+    parser.py           # Extracts sections and paragraph map from master .docx
+    generator.py        # Patches optimized sections in-place, exports PDF via LibreOffice
+  integrations/
+    google.py           # OAuth flow, SheetsSync, DriveUpload
   db/
-    database.py       # SQLAlchemy models and helpers
+    database.py         # SQLAlchemy models and helpers
   web/
-    app.py            # FastAPI routes
-    templates/        # Jinja2 HTML templates
-  models.py           # Pydantic models (JobListing, SearchCriteria, etc.)
-  config.py           # Settings via pydantic-settings
+    app.py              # FastAPI routes
+    templates/          # Jinja2 HTML templates
+  models.py             # Pydantic models (JobListing, SearchCriteria, etc.)
+  config.py             # Settings via pydantic-settings
 data/
-  resumes/            # Master resume (.docx)
-  output/             # Generated PDFs
-  applo.db            # SQLite database
-  search-config.json  # Persisted search criteria
-  model-config.json   # Persisted LLM model + key
+  resumes/              # Master resume (.docx) and parse cache (.json)
+  output/               # Generated PDFs (.docx intermediates + final PDFs)
+  applo.db              # SQLite database
+  search-config.json    # Persisted search criteria
+  model-config.json     # Persisted LLM model + key
+  token.json            # Google OAuth token (auto-managed)
 ```
 
 ---
@@ -180,8 +196,9 @@ data/
 | Browser automation | Playwright + playwright-stealth               |
 | LLM                | LiteLLM (Anthropic, OpenAI, Gemini, and more) |
 | Database           | SQLite via SQLAlchemy                         |
-| PDF generation     | ReportLab                                     |
-| Resume parsing     | python-docx + pdfplumber                      |
+| Resume parsing     | python-docx                                   |
+| PDF export         | LibreOffice (headless)                        |
+| Google integration | google-auth-oauthlib + gspread                |
 
 ---
 

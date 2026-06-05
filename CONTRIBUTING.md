@@ -9,14 +9,19 @@ Thanks for your interest in contributing to Applo. Adding a new job board scrape
 ```bash
 git clone https://github.com/kimanikevin254/applo.git
 cd applo
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
+uv sync
 playwright install chromium
 cp .env.example .env
 # fill in your ANTHROPIC_API_KEY
 mkdir -p data/resumes data/output
 python run.py
+```
+
+LibreOffice is required for PDF export:
+
+```bash
+sudo apt install libreoffice   # Ubuntu/Debian
+brew install --cask libreoffice  # macOS
 ```
 
 The app runs at [http://localhost:8000](http://localhost:8000).
@@ -39,13 +44,14 @@ No other files need to be touched. The scraper auto-discovers on the next startu
 ## Project layout
 
 ```
-applo/scrapers/    # Drop new scrapers here
-applo/pipeline/    # Resume optimization and filtering logic
-applo/resume/      # .docx parsing and PDF generation
-applo/web/         # FastAPI app and Jinja2 templates
-applo/db/          # SQLAlchemy ORM and session helpers
-applo/config.py    # All settings (pydantic-settings, reads from .env)
-applo/models.py    # Shared Pydantic models
+applo/scrapers/       # Drop new scrapers here
+applo/pipeline/       # Resume optimization and filtering logic
+applo/resume/         # .docx parsing and PDF generation via LibreOffice
+applo/integrations/   # Google OAuth, Sheets sync, Drive upload
+applo/web/            # FastAPI app and Jinja2 templates
+applo/db/             # SQLAlchemy ORM and session helpers
+applo/config.py       # All settings (pydantic-settings, reads from .env)
+applo/models.py       # Shared Pydantic models
 ```
 
 ---
@@ -64,11 +70,11 @@ Tests live in `tests/`. When adding a scraper, a basic test that instantiates th
 
 - Keep PRs focused. A scraper for one job board, a bug fix, or a single feature per PR.
 - Test your scraper against a real search before submitting. Include a note in the PR description about what search terms and location you tested with.
-- Do not commit your `.env` file or any keys.
+- Do not commit your `.env` file, `data/token.json`, `data/google_credentials.json`, or any keys.
 - The `data/` directory is gitignored. Do not commit database files or generated PDFs.
 
 ---
 
 ## Reporting issues
 
-Open an issue on GitHub. If it is a scraper that stopped working, include the job board URL and the error from the server log (`--log-level debug` helps).
+Open an issue on GitHub. If it is a scraper that stopped working, include the job board URL and the error from the server log (`logs/applo_<date>.log` has DEBUG-level output).
